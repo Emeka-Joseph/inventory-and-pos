@@ -1,0 +1,103 @@
+{% extends 'store/layout.html' %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_title_header %}Store Dashboard{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex p-3 mx-auto mb-2">
+        <i class="fa-solid fa-box fa-lg text-primary"></i>
+      </div>
+      <div class="fw-bold fs-4">{{ total_products }}</div>
+      <div class="text-muted small">Active Products</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex p-3 mx-auto mb-2">
+        <i class="fa-solid fa-triangle-exclamation fa-lg text-danger"></i>
+      </div>
+      <div class="fw-bold fs-4 text-danger">{{ low_stock|length }}</div>
+      <div class="text-muted small">Low Stock Items</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex p-3 mx-auto mb-2">
+        <i class="fa-solid fa-truck-ramp-box fa-lg text-success"></i>
+      </div>
+      <div class="fw-bold fs-4">{{ recent_entries|length }}</div>
+      <div class="text-muted small">Recent Entries</div>
+    </div>
+  </div>
+</div>
+
+{% if low_stock %}
+<div class="card border-0 shadow-sm border-start border-danger border-4 mb-3">
+  <div class="card-body">
+    <h6 class="fw-bold text-danger mb-2"><i class="fa-solid fa-triangle-exclamation me-2"></i>Low Stock Alert</h6>
+    <div class="d-flex flex-wrap gap-2">
+      {% for p in low_stock %}
+      <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
+        {{ p.name }} — {{ p.quantity_in_stock }} left
+      </span>
+      {% endfor %}
+    </div>
+    <a href="{{ url_for('store.stock_entry', slug=business.slug) }}" class="btn btn-danger btn-sm mt-2">
+      <i class="fa-solid fa-plus me-1"></i>Record Stock
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">Recent Stock Entries</h6>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0 small">
+          <thead class="table-light">
+            <tr><th>Date</th><th>Product</th><th>Qty</th><th>Cost</th><th>Ref</th><th>By</th></tr>
+          </thead>
+          <tbody>
+            {% for e in recent_entries %}
+            <tr>
+              <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="fw-semibold">{{ e.product.name }}</td>
+              <td class="text-success fw-bold">+{{ e.quantity }}</td>
+              <td>{% if e.total_cost %}{{ business.currency_symbol }}{{ "%.2f"|format(e.total_cost) }}{% else %}—{% endif %}</td>
+              <td>{{ e.reference or '—' }}</td>
+              <td>{{ e.recorder.full_name }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-3">No entries yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex flex-column gap-2">
+        <h6 class="fw-bold mb-2">Quick Actions</h6>
+        <a href="{{ url_for('store.stock_entry', slug=business.slug) }}" class="btn btn-primary btn-sm text-start">
+          <i class="fa-solid fa-truck-ramp-box me-2"></i>Record Incoming Stock
+        </a>
+        <a href="{{ url_for('store.add_product', slug=business.slug) }}" class="btn btn-outline-primary btn-sm text-start">
+          <i class="fa-solid fa-plus me-2"></i>Add New Product
+        </a>
+        <a href="{{ url_for('store.products', slug=business.slug) }}" class="btn btn-outline-secondary btn-sm text-start">
+          <i class="fa-solid fa-box me-2"></i>View Products
+        </a>
+        <a href="{{ url_for('pos.pos_home', slug=business.slug) }}" class="btn btn-success btn-sm text-start">
+          <i class="fa-solid fa-cash-register me-2"></i>Open POS
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

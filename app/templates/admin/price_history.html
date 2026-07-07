@@ -1,0 +1,34 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Price History{% endblock %}
+{% block page_title_header %}Price Change History{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0 small">
+      <thead class="table-dark">
+        <tr><th>Product</th><th>Old Price</th><th>New Price</th><th>Change</th><th>Changed By</th><th>Date/Time</th></tr>
+      </thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td class="fw-semibold">{{ h.product.name }}</td>
+          <td>{{ business.currency_symbol }}{{ "%.2f"|format(h.old_price) }}</td>
+          <td>{{ business.currency_symbol }}{{ "%.2f"|format(h.new_price) }}</td>
+          <td>
+            {% set diff = h.new_price - h.old_price %}
+            <span class="{% if diff > 0 %}text-success{% elif diff < 0 %}text-danger{% endif %} fw-semibold">
+              {{ '+' if diff > 0 else '' }}{{ business.currency_symbol }}{{ "%.2f"|format(diff) }}
+            </span>
+          </td>
+          <td>{{ h.changer.full_name }}</td>
+          <td>{{ h.changed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No price changes recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

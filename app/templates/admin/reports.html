@@ -1,0 +1,577 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block page_title_header %}Reports &amp; Analytics{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+.pnl-row { display:flex; justify-content:space-between; padding: 0.45rem 0.75rem; border-bottom:1px solid #f0f0f0; }
+.pnl-row.total-row { font-weight:700; border-top: 2px solid #dee2e6; border-bottom:none; }
+.pnl-row .label { color:#495057; }
+.pnl-row .amount { font-family: monospace; min-width:130px; text-align:right; }
+.pnl-section-header { background:#f8f9fa; padding:0.3rem 0.75rem; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#868e96; margin-top:4px; }
+.pnl-indent { padding-left:1.75rem; }
+.kpi-pill { border-radius:12px; padding: 1rem 1.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Period Selector -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 d-flex align-items-center flex-wrap gap-2">
+    <span class="text-muted small me-1">Period:</span>
+    {% for p in ['today','week','month','year'] %}
+    <a href="{{ url_for('admin.reports', slug=business.slug, period=p) }}"
+       class="btn btn-sm {% if period == p %}btn-dark{% else %}btn-outline-secondary{% endif %}">
+      {{ p.title() }}
+    </a>
+    {% endfor %}
+    <span class="ms-auto text-muted small">{{ start.strftime('%d %b %Y') }} → {{ end.strftime('%d %b %Y') }}</span>
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
+  <li class="nav-item">
+    <button class="nav-link active" id="fin-tab" data-bs-toggle="tab" data-bs-target="#tabFin" type="button">
+      <i class="fa-solid fa-scale-balanced me-1"></i>Financial Summary
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" id="sales-tab" data-bs-toggle="tab" data-bs-target="#tabSales" type="button">
+      <i class="fa-solid fa-chart-bar me-1"></i>Sales Analytics
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="reportTabContent">
+
+  <!-- ════════════════════════════ FINANCIAL SUMMARY TAB ════════════════════ -->
+  <div class="tab-pane fade show active" id="tabFin" role="tabpanel">
+
+    <!-- P&L KPI Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-2-5">
+        <div class="kpi-pill card border-0 shadow-sm text-center">
+          <div class="text-muted small mb-1">Revenue</div>
+          <div class="fw-bold fs-5 text-success">{{ business.currency_symbol }}{{ "{:,.2f}".format(summary.total_revenue) }}</div>
+          <div class="text-muted" style="font-size:0.7rem">{{ summary.total_count }} sales</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2-5">
+        <div class="kpi-pill card border-0 shadow-sm text-center">
+          <div class="text-muted small mb-1">Cost of Goods</div>
+          <div class="fw-bold fs-5 text-warning">{{ business.currency_symbol }}{{ "{:,.2f}".format(cogs) }}</div>
+          {% if summary.total_revenue > 0 %}<div class="text-muted" style="font-size:0.7rem">{{ "%.1f"|format(cogs / summary.total_revenue * 100) }}% of rev</div>{% endif %}
+        </div>
+      </div>
+      <div class="col-6 col-lg-2-5">
+        <div class="kpi-pill card border-0 shadow-sm text-center">
+          <div class="text-muted small mb-1">Gross Profit</div>
+          <div class="fw-bold fs-5 {% if gross_profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
+            {{ business.currency_symbol }}{{ "{:,.2f}".format(gross_profit) }}
+          </div>
+          <div class="text-muted" style="font-size:0.7rem">Margin {{ "%.1f"|format(gross_margin) }}%</div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2-5">
+        <div class="kpi-pill card border-0 shadow-sm text-center">
+          <div class="text-muted small mb-1">Operating Expenses</div>
+          <div class="fw-bold fs-5 text-danger">{{ business.currency_symbol }}{{ "{:,.2f}".format(total_expenses) }}</div>
+          <div class="text-muted" style="font-size:0.7rem">{{ period_expenses|length }} items</div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-2-5">
+        <div class="kpi-pill card border-0 shadow-sm text-center {% if net_profit >= 0 %}border-success{% else %}border-danger{% endif %}" style="border-width:2px !important;">
+          <div class="text-muted small mb-1">Net Profit</div>
+          <div class="fw-bold fs-4 {% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ business.currency_symbol }}{{ "{:,.2f}".format(net_profit) }}
+          </div>
+          <div class="text-muted" style="font-size:0.7rem">Net Margin {{ "%.1f"|format(net_margin) }}%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+
+      <!-- P&L Statement -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-dark text-white d-flex align-items-center">
+            <i class="fa-solid fa-file-invoice-dollar me-2"></i>
+            <span class="fw-bold small">Profit &amp; Loss Statement</span>
+            <span class="ms-auto badge bg-secondary small">{{ start.strftime('%d %b') }} – {{ end.strftime('%d %b %Y') }}</span>
+          </div>
+          <div class="card-body p-0">
+
+            <div class="pnl-section-header">Income</div>
+            <div class="pnl-row">
+              <span class="label">Total Revenue (Sales)</span>
+              <span class="amount text-success">{{ business.currency_symbol }}{{ "{:,.2f}".format(summary.total_revenue) }}</span>
+            </div>
+            {% if summary.total_discount > 0 %}
+            <div class="pnl-row pnl-indent">
+              <span class="label text-muted small">— Discounts Given</span>
+              <span class="amount text-muted small">({{ business.currency_symbol }}{{ "{:,.2f}".format(summary.total_discount) }})</span>
+            </div>
+            {% endif %}
+
+            <div class="pnl-section-header mt-1">Cost of Goods Sold</div>
+            <div class="pnl-row pnl-indent">
+              <span class="label">Cost of Goods Sold (COGS)</span>
+              <span class="amount text-warning">({{ business.currency_symbol }}{{ "{:,.2f}".format(cogs) }})</span>
+            </div>
+
+            <div class="pnl-row total-row {% if gross_profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
+              <span class="label">Gross Profit</span>
+              <span class="amount">{{ business.currency_symbol }}{{ "{:,.2f}".format(gross_profit) }}
+                <small class="ms-1 fw-normal opacity-75">({{ "%.1f"|format(gross_margin) }}%)</small>
+              </span>
+            </div>
+
+            {% if expense_by_cat %}
+            <div class="pnl-section-header mt-1">Operating Expenses</div>
+            {% for cat, amt in expense_by_cat.items() %}
+            <div class="pnl-row pnl-indent">
+              <span class="label">{{ cat }}</span>
+              <span class="amount text-danger">({{ business.currency_symbol }}{{ "{:,.2f}".format(amt) }})</span>
+            </div>
+            {% endfor %}
+            <div class="pnl-row pnl-indent" style="border-top:1px dashed #dee2e6; font-weight:600;">
+              <span class="label">Total Operating Expenses</span>
+              <span class="amount text-danger">({{ business.currency_symbol }}{{ "{:,.2f}".format(total_expenses) }})</span>
+            </div>
+            {% else %}
+            <div class="pnl-section-header mt-1">Operating Expenses</div>
+            <div class="pnl-row pnl-indent text-muted small">
+              <span>No expenses recorded for this period.</span>
+              <span></span>
+            </div>
+            {% endif %}
+
+            <div class="pnl-row total-row {% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size:1.05rem; background:#f8f9fa;">
+              <span class="label">Net Profit / (Loss)</span>
+              <span class="amount">{{ business.currency_symbol }}{{ "{:,.2f}".format(net_profit) }}
+                <small class="ms-1 fw-normal opacity-75">({{ "%.1f"|format(net_margin) }}%)</small>
+              </span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Expense Management -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white border-0 pt-3 d-flex align-items-center">
+            <h6 class="fw-bold mb-0"><i class="fa-solid fa-receipt me-2 text-danger"></i>Expenses — {{ start.strftime('%d %b') }} to {{ end.strftime('%d %b %Y') }}</h6>
+            <button class="btn btn-danger btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+              <i class="fa-solid fa-plus me-1"></i>Add Expense
+            </button>
+          </div>
+          <div class="card-body p-0" style="max-height:340px;overflow-y:auto">
+            <table class="table table-hover table-sm align-middle mb-0 small">
+              <thead class="table-light sticky-top">
+                <tr><th>Date</th><th>Category</th><th>Description</th><th class="text-end">Amount</th><th></th></tr>
+              </thead>
+              <tbody>
+                {% for e in period_expenses %}
+                <tr>
+                  <td class="text-nowrap">{{ e.expense_date.strftime('%d %b %Y') }}</td>
+                  <td><span class="badge bg-secondary">{{ e.category }}</span></td>
+                  <td>{{ e.description or '—' }}</td>
+                  <td class="text-end fw-semibold text-danger">{{ business.currency_symbol }}{{ "{:,.2f}".format(e.amount) }}</td>
+                  <td>
+                    <form method="POST" action="{{ url_for('admin.delete_expense', slug=business.slug, expense_id=e.id) }}"
+                          onsubmit="return confirm('Delete this expense?')">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      <input type="hidden" name="period" value="{{ period }}"/>
+                      <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Delete">
+                        <i class="fa-solid fa-trash-can fa-xs"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-muted py-4">
+                  No expenses recorded.<br>
+                  <small>Use the <strong>Add Expense</strong> button to record rent, salaries, utilities, taxes, etc.</small>
+                </td></tr>
+                {% endfor %}
+              </tbody>
+              {% if period_expenses %}
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="3" class="fw-bold text-end">Total Expenses:</td>
+                  <td class="text-end fw-bold text-danger">{{ business.currency_symbol }}{{ "{:,.2f}".format(total_expenses) }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+              {% endif %}
+            </table>
+          </div>
+        </div>
+
+        <!-- Expense breakdown donut -->
+        {% if expense_by_cat %}
+        <div class="card border-0 shadow-sm mt-3">
+          <div class="card-body py-2">
+            <div class="row align-items-center">
+              <div class="col-5">
+                <canvas id="expenseDonut" height="160"></canvas>
+              </div>
+              <div class="col-7">
+                <table class="table table-sm mb-0 small">
+                  <tbody>
+                    {% for cat, amt in expense_by_cat.items() %}
+                    <tr>
+                      <td>{{ cat }}</td>
+                      <td class="text-end fw-semibold">{{ business.currency_symbol }}{{ "{:,.2f}".format(amt) }}</td>
+                      <td class="text-muted">{{ "%.0f"|format(amt / total_expenses * 100) if total_expenses else 0 }}%</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Yearly P&L Overview ───────────────────────────────────────────────── -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-0 pt-3 d-flex align-items-center">
+        <h6 class="fw-bold mb-0">
+          <i class="fa-solid fa-chart-line me-2 text-primary"></i>
+          Yearly Financial Overview — {{ current_year }}
+        </h6>
+      </div>
+      <div class="card-body">
+        <canvas id="yearlyChart" height="90"></canvas>
+      </div>
+    </div>
+
+    <!-- Yearly P&L Table -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0"><i class="fa-solid fa-table me-2"></i>Monthly Breakdown — {{ current_year }}</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0 small">
+            <thead class="table-dark">
+              <tr>
+                <th>Month</th>
+                <th class="text-end">Revenue</th>
+                <th class="text-end">COGS</th>
+                <th class="text-end">Gross Profit</th>
+                <th class="text-end">Expenses</th>
+                <th class="text-end">Net Profit</th>
+                <th class="text-end">Net Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set yr_rev_total = yearly_rev | sum %}
+              {% set yr_cogs_total = yearly_cogs | sum %}
+              {% set yr_exp_total = yearly_exp | sum %}
+              {% set yr_gross_total = yearly_gross | sum %}
+              {% set yr_net_total = yearly_net | sum %}
+              {% for i in range(12) %}
+              {% set m_net = yearly_net[i] %}
+              {% set m_rev = yearly_rev[i] %}
+              <tr class="{% if m_net < 0 %}table-danger{% elif m_net > 0 and m_rev > 0 %}table-success bg-opacity-10{% endif %}">
+                <td class="fw-semibold">{{ yearly_labels[i] }}</td>
+                <td class="text-end">{% if m_rev > 0 %}{{ business.currency_symbol }}{{ "{:,.0f}".format(m_rev) }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                <td class="text-end text-warning">{% if yearly_cogs[i] > 0 %}{{ business.currency_symbol }}{{ "{:,.0f}".format(yearly_cogs[i]) }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                <td class="text-end {% if yearly_gross[i] >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                  {{ business.currency_symbol }}{{ "{:,.0f}".format(yearly_gross[i]) }}
+                </td>
+                <td class="text-end text-danger">{% if yearly_exp[i] > 0 %}{{ business.currency_symbol }}{{ "{:,.0f}".format(yearly_exp[i]) }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                <td class="text-end fw-semibold {% if m_net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ business.currency_symbol }}{{ "{:,.0f}".format(m_net) }}
+                </td>
+                <td class="text-end text-muted">
+                  {% if m_rev > 0 %}{{ "%.1f"|format(m_net / m_rev * 100) }}%{% else %}—{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-dark">
+              <tr>
+                <td class="fw-bold">Year Total</td>
+                <td class="text-end fw-bold">{{ business.currency_symbol }}{{ "{:,.0f}".format(yr_rev_total) }}</td>
+                <td class="text-end fw-bold">{{ business.currency_symbol }}{{ "{:,.0f}".format(yr_cogs_total) }}</td>
+                <td class="text-end fw-bold">{{ business.currency_symbol }}{{ "{:,.0f}".format(yr_gross_total) }}</td>
+                <td class="text-end fw-bold">{{ business.currency_symbol }}{{ "{:,.0f}".format(yr_exp_total) }}</td>
+                <td class="text-end fw-bold {% if yr_net_total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ business.currency_symbol }}{{ "{:,.0f}".format(yr_net_total) }}
+                </td>
+                <td class="text-end fw-bold">
+                  {% if yr_rev_total > 0 %}{{ "%.1f"|format(yr_net_total / yr_rev_total * 100) }}%{% else %}—{% endif %}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tabFin -->
+
+
+  <!-- ════════════════════════════ SALES ANALYTICS TAB ═════════════════════ -->
+  <div class="tab-pane fade" id="tabSales" role="tabpanel">
+
+    <!-- Summary KPIs -->
+    <div class="row g-3 mb-4">
+      <div class="col-sm-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="text-muted small">Total Revenue</div>
+          <div class="fw-bold fs-4 text-success">{{ business.currency_symbol }}{{ "{:,.2f}".format(summary.total_revenue) }}</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="text-muted small">Transactions</div>
+          <div class="fw-bold fs-4">{{ summary.total_count }}</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+          <div class="text-muted small">Avg Transaction</div>
+          <div class="fw-bold fs-4">{{ business.currency_symbol }}{{ "{:,.2f}".format(summary.avg_sale) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revenue Trend Chart -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">Revenue Trend</h6></div>
+      <div class="card-body"><canvas id="revenueChart" height="80"></canvas></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">Top Products by Revenue</h6></div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0 small">
+              <thead class="table-light"><tr><th>#</th><th>Product</th><th class="text-end">Qty</th><th class="text-end">Revenue</th></tr></thead>
+              <tbody>
+                {% for p in top_products %}
+                <tr>
+                  <td class="text-muted">{{ loop.index }}</td>
+                  <td>{{ p.product_name }}</td>
+                  <td class="text-end">{{ p.qty_sold }}</td>
+                  <td class="text-end fw-semibold">{{ business.currency_symbol }}{{ "{:,.2f}".format(p.revenue) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No data.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">Sales by Rep</h6></div>
+          <div class="card-body p-0">
+            <table class="table table-sm mb-0 small">
+              <thead class="table-light"><tr><th>Rep</th><th class="text-end">Sales</th><th class="text-end">Revenue</th></tr></thead>
+              <tbody>
+                {% for r in sales_by_rep %}
+                <tr>
+                  <td>{{ ((r.first_name or '') + ' ' + (r.last_name or '')).strip() or r.username }}</td>
+                  <td class="text-end">{{ r.count }}</td>
+                  <td class="text-end fw-semibold">{{ business.currency_symbol }}{{ "{:,.2f}".format(r.revenue) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="text-center text-muted py-3">No data.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">Payment Methods</h6></div>
+          <div class="card-body">
+            <canvas id="paymentChart"></canvas>
+            <table class="table table-sm mt-3 small mb-0">
+              <thead class="table-light"><tr><th>Method</th><th class="text-end">Count</th><th class="text-end">Revenue</th></tr></thead>
+              <tbody>
+                {% for pm in payment_breakdown %}
+                <tr>
+                  <td>{{ pm.payment_method.title() }}</td>
+                  <td class="text-end">{{ pm.count }}</td>
+                  <td class="text-end">{{ business.currency_symbol }}{{ "{:,.2f}".format(pm.revenue) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3" class="text-center text-muted py-2">No data.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-header bg-white border-0 pt-3"><h6 class="fw-bold mb-0">Top 10 Products</h6></div>
+          <div class="card-body"><canvas id="productsChart" height="120"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tabSales -->
+</div><!-- /tab-content -->
+
+
+<!-- ── Add Expense Modal ──────────────────────────────────────────────────── -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin.add_expense', slug=business.slug) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="period" value="{{ period }}"/>
+        <div class="modal-header bg-danger text-white">
+          <h6 class="modal-title fw-bold"><i class="fa-solid fa-plus me-2"></i>Record Expense</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+              <select name="category" class="form-select" required>
+                <option value="">— Select —</option>
+                {% for cat in expense_categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Amount ({{ business.currency_symbol }}) <span class="text-danger">*</span></label>
+              <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required
+                     placeholder="0.00"/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Date <span class="text-danger">*</span></label>
+              <input type="date" name="expense_date" class="form-control"
+                     value="{{ start.strftime('%Y-%m-%d') }}" required/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Description</label>
+              <input type="text" name="description" class="form-control" placeholder="Optional note"/>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="fa-solid fa-floppy-disk me-1"></i>Save Expense
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SYM  = '{{ business.currency_symbol }}';
+const COLORS = ['#198754','#dc3545','#0d6efd','#fd7e14','#6f42c1','#0dcaf0','#20c997','#ffc107','#6c757d','#d63384'];
+
+// ── Activate correct tab from URL param (?t=fin or ?t=sales) ─────────────────
+(function(){
+  const t = new URLSearchParams(location.search).get('t');
+  if (t === 'sales') {
+    document.getElementById('sales-tab').click();
+  }
+  // default is Financial Summary (already active)
+})();
+
+// ── Yearly P&L Chart ─────────────────────────────────────────────────────────
+new Chart(document.getElementById('yearlyChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ yearly_labels | tojson }},
+    datasets: [
+      { label: 'Revenue',   data: {{ yearly_rev   | tojson }}, backgroundColor: 'rgba(25,135,84,0.75)',  order: 2 },
+      { label: 'COGS',      data: {{ yearly_cogs  | tojson }}, backgroundColor: 'rgba(253,126,20,0.75)', order: 2 },
+      { label: 'Expenses',  data: {{ yearly_exp   | tojson }}, backgroundColor: 'rgba(220,53,69,0.75)',  order: 2 },
+      { label: 'Net Profit',data: {{ yearly_net   | tojson }}, type: 'line',
+        borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.1)',
+        borderWidth: 2, pointRadius: 4, tension: 0.35, fill: true, order: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'bottom' },
+               tooltip: { callbacks: { label: ctx => ' ' + SYM + ctx.parsed.y.toLocaleString('en', {minimumFractionDigits:0}) }}},
+    scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+  }
+});
+
+// ── Expense Donut ─────────────────────────────────────────────────────────────
+{% if expense_by_cat %}
+new Chart(document.getElementById('expenseDonut'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ expense_by_cat.keys() | list | tojson }},
+    datasets: [{ data: {{ expense_by_cat.values() | list | tojson }}, backgroundColor: COLORS }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } } }
+});
+{% endif %}
+
+// ── Revenue Trend Chart (Sales tab) ──────────────────────────────────────────
+new Chart(document.getElementById('revenueChart'), {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels | tojson }},
+    datasets: [{ label: 'Revenue', data: {{ chart_revenue | tojson }},
+      borderColor: '#198754', backgroundColor: 'rgba(25,135,84,0.1)',
+      tension: 0.4, fill: true }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } }
+});
+
+// ── Payment Donut ─────────────────────────────────────────────────────────────
+{% if payment_breakdown %}
+new Chart(document.getElementById('paymentChart'), {
+  type: 'doughnut',
+  data: {
+    labels: {{ payment_breakdown | map(attribute='payment_method') | list | tojson }},
+    datasets: [{ data: {{ payment_breakdown | map(attribute='count') | list | tojson }},
+      backgroundColor: COLORS }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+{% endif %}
+
+// ── Top Products Bar ──────────────────────────────────────────────────────────
+{% if top_products %}
+new Chart(document.getElementById('productsChart'), {
+  type: 'bar',
+  data: {
+    labels: {{ top_products | map(attribute='product_name') | list | tojson }},
+    datasets: [{ label: 'Revenue',
+      data: {{ top_products | map(attribute='revenue') | map('float') | list | tojson }},
+      backgroundColor: COLORS }]
+  },
+  options: { responsive: true, indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: { x: { beginAtZero: true }, y: { grid: { display: false } } } }
+});
+{% endif %}
+</script>
+{% endblock %}

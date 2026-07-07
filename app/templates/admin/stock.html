@@ -1,0 +1,98 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Stock Management{% endblock %}
+{% block page_title_header %}Stock Management{% endblock %}
+
+{% block content %}
+{% if low_stock_items %}
+<div class="alert alert-warning d-flex align-items-center mb-3">
+  <i class="fa-solid fa-triangle-exclamation me-2"></i>
+  <div>
+    <strong>{{ low_stock_items|length }} item(s) at or below reorder level.</strong>
+    <span class="ms-2">
+      {% for p in low_stock_items %}<span class="badge bg-warning text-dark me-1">{{ p.name }} ({{ p.quantity_in_stock }})</span>{% endfor %}
+    </span>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <!-- Adjust Stock -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-dark text-white">
+        <h6 class="mb-0 fw-bold"><i class="fa-solid fa-sliders me-2"></i>Admin Stock Adjustment</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">Manually adjust stock quantity (positive to add, negative to remove).</p>
+        <form method="POST" action="{{ url_for('admin.adjust_stock', slug=business.slug) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Product</label>
+            <select name="product_id" class="form-select form-select-sm" required>
+              <option value="">Select product...</option>
+              {% for p in all_products %}
+              <option value="{{ p.id }}">{{ p.name }} ({{ p.quantity_in_stock }} {{ p.unit }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Quantity (+ to add, - to remove)</label>
+            <input type="number" name="quantity" class="form-control form-control-sm" placeholder="e.g. 10 or -5" required/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Reason</label>
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="e.g. damaged goods, correction"/>
+          </div>
+          <button type="submit" class="btn btn-dark btn-sm w-100">Apply Adjustment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Entries -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 d-flex align-items-center pt-3">
+        <h6 class="fw-bold mb-0">Stock Entry Log</h6>
+        <form class="ms-auto d-flex gap-2" method="GET">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
+            <input type="text" name="q" class="form-control" placeholder="Search..." value="{{ q }}"/>
+          </div>
+          <button class="btn btn-outline-dark btn-sm">Go</button>
+        </form>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height:500px">
+          <table class="table table-hover table-sm align-middle mb-0 small">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th>Date</th><th>Product</th><th>Qty</th>
+                <th>Unit Cost</th><th>Total Cost</th><th>Ref</th><th>Recorded By</th><th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in entries %}
+              <tr>
+                <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td class="fw-semibold">{{ e.product.name }}</td>
+                <td class="{% if e.quantity < 0 %}text-danger{% else %}text-success{% endif %} fw-bold">
+                  {{ '+' if e.quantity > 0 else '' }}{{ e.quantity }}
+                </td>
+                <td>{{ business.currency_symbol }}{{ "%.2f"|format(e.unit_cost) if e.unit_cost else '—' }}</td>
+                <td>{{ business.currency_symbol }}{{ "%.2f"|format(e.total_cost) if e.total_cost else '—' }}</td>
+                <td>{{ e.reference or '—' }}</td>
+                <td>{{ e.recorder.full_name }}</td>
+                <td class="text-muted" style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.notes or '—' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="text-center text-muted py-4">No stock entries yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

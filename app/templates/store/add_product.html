@@ -1,0 +1,168 @@
+{% extends 'store/layout.html' %}
+{% block page_title %}Add New Product{% endblock %}
+{% block page_title_header %}Add New Product{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('store.products', slug=business.slug) }}" class="btn btn-outline-primary btn-sm">
+    <i class="fa-solid fa-arrow-left me-1"></i>Back to Products
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="alert alert-info small">
+      <i class="fa-solid fa-circle-info me-2"></i>
+      Once a product is created, its record cannot be altered. To add stock to an existing product, use
+      <a href="{{ url_for('store.stock_entry', slug=business.slug) }}">Record Stock</a>.
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST" id="productForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="row g-3">
+
+            <!-- Barcode -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                <i class="fa-solid fa-barcode me-1 text-primary"></i>Barcode
+                <span class="text-danger">*</span>
+                <span class="badge bg-primary ms-2 small">Scanner Ready</span>
+              </label>
+              <div class="input-group">
+                <input type="text" name="barcode" id="barcodeField"
+                       class="form-control form-control-lg font-monospace"
+                       placeholder="Scan barcode or type manually then press Enter"
+                       autocomplete="off" required autofocus/>
+                <button type="button" class="btn btn-outline-primary" id="scanToggleBtn" title="HID scanner — click and scan">
+                  <i class="fa-solid fa-barcode fa-lg"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="cameraBtn" title="Use camera to scan">
+                  <i class="fa-solid fa-camera"></i>
+                </button>
+              </div>
+              <div id="barcodeStatus" class="form-text mt-1">
+                <i class="fa-solid fa-bolt text-warning me-1"></i>
+                Ready to scan — focus this field and scan, or use the camera button.
+              </div>
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Product Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" placeholder="e.g. Basmati Rice 5kg" required/>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Initial Stock Qty</label>
+              <input type="number" name="initial_qty" class="form-control" min="0" value="0"/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Selling Price <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">{{ business.currency_symbol }}</span>
+                <input type="number" name="unit_price" class="form-control" step="0.01" min="0" value="0.00" required/>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Cost Price</label>
+              <div class="input-group">
+                <span class="input-group-text">{{ business.currency_symbol }}</span>
+                <input type="number" name="cost_price" class="form-control" step="0.01" min="0" value="0.00"/>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Category</label>
+              <select name="category_id" class="form-select">
+                <option value="">— No Category —</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Unit</label>
+              <select name="unit" class="form-select">
+                {% for u in ['piece','kg','g','litre','ml','box','carton','pack','dozen','pair','bag','bottle'] %}
+                <option value="{{ u }}">{{ u }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Reorder At</label>
+              <input type="number" name="reorder_level" class="form-control" min="0" value="5"/>
+            </div>
+
+            <!-- Manufacture & Expiry dates -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="fa-solid fa-industry me-1 text-muted"></i>Manufacture Date
+              </label>
+              <input type="date" name="manufacture_date" class="form-control"/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="fa-solid fa-calendar-xmark me-1 text-danger"></i>Expiry Date
+              </label>
+              <input type="date" name="expiry_date" class="form-control"/>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Description</label>
+              <textarea name="description" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+          <hr/>
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-plus me-1"></i>Create Product
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const barcodeField = document.getElementById('barcodeField');
+const barcodeStatus = document.getElementById('barcodeStatus');
+
+let scanTimer = null;
+
+barcodeField.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const code = this.value.trim();
+    if (code) confirmBarcode(code);
+  }
+});
+
+barcodeField.addEventListener('input', function() {
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    const code = this.value.trim();
+    if (code.length >= 3) confirmBarcode(code);
+  }, 80);
+});
+
+function confirmBarcode(code) {
+  barcodeField.classList.add('border-primary');
+  barcodeStatus.innerHTML =
+    '<i class="fa-solid fa-circle-check text-primary me-1"></i>' +
+    `Barcode <strong class="font-monospace">${code}</strong> captured. Fill in product details below.`;
+  const nameField = document.querySelector('input[name="name"]');
+  if (nameField && !nameField.value) nameField.focus();
+}
+
+document.getElementById('scanToggleBtn').addEventListener('click', function() {
+  barcodeField.value = '';
+  barcodeField.focus();
+  barcodeStatus.innerHTML = '<i class="fa-solid fa-bolt text-warning me-1"></i>Ready — scan now…';
+});
+
+document.getElementById('cameraBtn').addEventListener('click', function() {
+  openCameraScanner(function(code) {
+    barcodeField.value = code;
+    confirmBarcode(code);
+  });
+});
+</script>
+{% endblock %}

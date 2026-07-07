@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% block title %}Super Admin — Eventry POS{% endblock %}
+{% block body %}
+<!-- Topbar -->
+<nav class="navbar navbar-dark px-4 py-2 d-flex align-items-center"
+     style="background:#1a1a2e;position:sticky;top:0;z-index:100;">
+  <span class="navbar-brand fw-bold mb-0">
+    <i class="fa-solid fa-shield-halved text-warning me-2"></i>Eventry POS — Super Admin
+  </span>
+  <div class="ms-auto d-flex align-items-center gap-3">
+    <span class="text-white-50 small">
+      <i class="fa-solid fa-user-tie me-1"></i>{{ session.get('superadmin_username') }}
+    </span>
+    <a href="{{ url_for('superadmin.logout') }}" class="btn btn-outline-warning btn-sm">
+      <i class="fa-solid fa-right-from-bracket me-1"></i>Logout
+    </a>
+  </div>
+</nav>
+
+<div class="container-xl py-4">
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- KPI strip -->
+  <div class="row g-3 mb-4">
+    {% set kpis = [
+      ('total',     stats.total,     'fa-building',     'bg-dark',    'All Businesses'),
+      ('active',    stats.active,    'fa-circle-check', 'bg-success', 'Active'),
+      ('pending',   stats.pending,   'fa-clock',        'bg-warning', 'Pending Approval'),
+      ('suspended', stats.suspended, 'fa-ban',          'bg-danger',  'Suspended'),
+    ] %}
+    {% for key, count, icon, color, label in kpis %}
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm text-center py-3 {{ color }} text-white">
+        <i class="fa-solid {{ icon }} fa-lg mb-1"></i>
+        <div class="fw-bold fs-3">{{ count }}</div>
+        <div class="small opacity-75">{{ label }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Business Table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-3 d-flex align-items-center">
+      <h5 class="fw-bold mb-0"><i class="fa-solid fa-list me-2"></i>All Businesses</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 small">
+          <thead class="table-dark">
+            <tr>
+              <th>Business</th>
+              <th>Email</th>
+              <th class="text-center">Users</th>
+              <th class="text-center">Status</th>
+              <th class="text-center">Plan</th>
+              <th class="text-center">Subscription</th>
+              <th>Registered</th>
+              <th class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for biz in businesses %}
+            {% set sub = biz.subscription %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ biz.name }}</div>
+                <div class="text-muted font-monospace" style="font-size:0.7rem">/{{ biz.slug }}</div>
+              </td>
+              <td>{{ biz.email }}</td>
+              <td class="text-center">{{ biz._user_count }}</td>
+              <td class="text-center">
+                {% if biz.status == 'active' %}
+                  <span class="badge bg-success">Active</span>
+                {% elif biz.status == 'pending' %}
+                  <span class="badge bg-warning text-dark">Pending</span>
+                {% else %}
+                  <span class="badge bg-danger">Suspended</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if sub %}
+                  <span class="badge {{ sub.features.badge_class }}">{{ sub.features.label }}</span>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if sub %}
+                  {% if sub.status == 'trialing' %}
+                    <span class="text-info small">
+                      Trial
+                      {% if sub.trial_days_left > 0 %}
+                        ({{ sub.trial_days_left }}d left)
+                      {% else %}
+                        (expired)
+                      {% endif %}
+                    </span>
+                  {% elif sub.status == 'active' %}
+                    <span class="text-success small">
+                      Active
+                      {% if sub.days_until_expiry is not none %}
+                        ({{ sub.days_until_expiry }}d)
+                      {% endif %}
+                    </span>
+                  {% elif sub.status == 'expired' %}
+                    <span class="text-danger small">Expired</span>
+                  {% else %}
+                    <span class="text-secondary small">{{ sub.status|title }}</span>
+                  {% endif %}
+                  <br/>
+                  <span class="text-muted" style="font-size:0.65rem">
+                    {{ sub.billing_cycle or 'n/a' }}
+                  </span>
+                {% else %}
+                  <span class="text-muted small">No sub</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">{{ biz.created_at.strftime('%d %b %Y') }}</td>
+              <td class="text-center text-nowrap">
+
+                {% if biz.status == 'pending' %}
+                  <form method="POST" action="{{ url_for('superadmin.approve', biz_id=biz.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button class="btn btn-success btn-sm" title="Approve"><i class="fa-solid fa-check"></i></button>
+                  </form>
+                {% elif biz.status == 'active' %}
+                  <form method="POST" action="{{ url_for('superadmin.suspend', biz_id=biz.id) }}" class="d-inline"
+                        onsubmit="return confirm('Suspend {{ biz.name }}?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button class="btn btn-warning btn-sm text-dark" title="Suspend"><i class="fa-solid fa-ban"></i></button>
+                  </form>
+                {% elif biz.status == 'suspended' %}
+                  <form method="POST" action="{{ url_for('superadmin.activate', biz_id=biz.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button class="btn btn-success btn-sm" title="Re-activate"><i class="fa-solid fa-rotate"></i></button>
+                  </form>
+                {% endif %}
+
+                <!-- Set plan button -->
+                <button class="btn btn-outline-primary btn-sm" title="Set Plan"
+                        onclick="openPlanModal({{ biz.id }}, '{{ biz.name }}',
+                          '{{ sub.plan if sub else 'free' }}',
+                          '{{ sub.billing_cycle if sub and sub.billing_cycle else 'monthly' }}',
+                          '{{ sub.status if sub else 'active' }}')">
+                  <i class="fa-solid fa-sliders"></i>
+                </button>
+
+                {% if biz.status == 'active' %}
+                  <a href="/{{ biz.slug }}/admin/" class="btn btn-outline-secondary btn-sm" target="_blank" title="View portal">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  </a>
+                {% endif %}
+
+                <button class="btn btn-outline-danger btn-sm" title="Delete"
+                        onclick="confirmDelete('{{ biz.id }}','{{ biz.name }}')">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <!-- hidden delete form -->
+                <form id="del-{{ biz.id }}" method="POST"
+                      action="{{ url_for('superadmin.delete_business', biz_id=biz.id) }}" class="d-none">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                </form>
+
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-5">No businesses registered yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Set Plan Modal -->
+<div class="modal fade" id="planModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Set Plan — <span id="planModalBizName"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="planForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Plan</label>
+            <select name="plan" id="planSelect" class="form-select">
+              <option value="free">Free</option>
+              <option value="pro">Pro ($10/mo or $100/yr)</option>
+              <option value="premium">Premium ($20/mo or $180/yr)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Billing Cycle</label>
+            <select name="billing_cycle" id="cycleSelect" class="form-select">
+              <option value="monthly">Monthly</option>
+              <option value="annual">Annual</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Subscription Status</label>
+            <select name="status" id="statusSelect" class="form-select">
+              <option value="active">Active</option>
+              <option value="trialing">Trialing</option>
+              <option value="expired">Expired</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <p class="text-muted small">
+            Setting status to <strong>Active</strong> on a paid plan will reset the billing period
+            (30 days monthly / 365 days annual) from today.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-floppy-disk me-1"></i>Save Plan
+          </button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmDelete(id, name) {
+  if (confirm('Permanently delete "' + name + '" and ALL its data? This cannot be undone.')) {
+    document.getElementById('del-' + id).submit();
+  }
+}
+
+function openPlanModal(bizId, bizName, plan, cycle, status) {
+  document.getElementById('planModalBizName').textContent = bizName;
+  document.getElementById('planForm').action = '/superadmin/businesses/' + bizId + '/set-plan';
+  document.getElementById('planSelect').value   = plan;
+  document.getElementById('cycleSelect').value  = cycle;
+  document.getElementById('statusSelect').value = status;
+  new bootstrap.Modal(document.getElementById('planModal')).show();
+}
+</script>
+{% endblock %}

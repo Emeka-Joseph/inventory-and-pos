@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Complete Registration — Eventry POS{% endblock %}
+{% block body %}
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="/"><i class="fa-solid fa-store me-2"></i>Eventry POS</a>
+  </div>
+</nav>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+
+      <!-- Progress steps -->
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-4">
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge rounded-pill bg-success px-3 py-2"><i class="fa-solid fa-check"></i></span>
+          <span class="small text-muted">Verify Email</span>
+        </div>
+        <div class="flex-grow-1 border-top border-2 border-success mx-2" style="max-width:40px"></div>
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge rounded-pill bg-success px-3 py-2"><i class="fa-solid fa-check"></i></span>
+          <span class="small text-muted">Enter Code</span>
+        </div>
+        <div class="flex-grow-1 border-top border-2 border-success mx-2" style="max-width:40px"></div>
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge rounded-pill bg-success px-3 py-2">3</span>
+          <span class="small fw-semibold">Complete Setup</span>
+        </div>
+      </div>
+
+      <h3 class="fw-bold mb-1">Set Up Your Business</h3>
+      <p class="text-muted mb-4">Fill in your details. Your account will be reviewed and activated shortly.</p>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+            <!-- Verified email (read-only) -->
+            <div class="alert alert-success py-2 mb-4 d-flex align-items-center gap-2">
+              <i class="fa-solid fa-circle-check"></i>
+              <span class="small">Email verified: <strong>{{ email }}</strong></span>
+            </div>
+
+            <h6 class="fw-bold text-uppercase text-muted mb-3 small">Business Information</h6>
+            <div class="row g-3 mb-3">
+              <div class="col-md-8">
+                <label class="form-label">Business Name <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control"
+                       placeholder="e.g. Chigold African Stores"
+                       value="{{ form.get('name','') }}" required/>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Currency</label>
+                <select name="currency" id="currencySelect" class="form-select">
+                  {% for code, symbol, label in CURRENCIES %}
+                  <option value="{{ code }}"
+                          data-symbol="{{ symbol }}"
+                          {% if form.get('currency', 'NGN') == code %}selected{% endif %}>
+                    {{ symbol }} — {{ label }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <input type="hidden" name="currency_symbol" id="currencySymbol"
+                       value="{{ form.get('currency_symbol','₦') }}"/>
+              </div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" name="phone" class="form-control" placeholder="+234..."
+                       value="{{ form.get('phone','') }}"/>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Business Address</label>
+                <input type="text" name="address" class="form-control" placeholder="Optional"
+                       value="{{ form.get('address','') }}"/>
+              </div>
+            </div>
+
+            <hr/>
+            <h6 class="fw-bold text-uppercase text-muted mb-3 small">Admin Account</h6>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">First Name</label>
+                <input type="text" name="admin_first" class="form-control"
+                       value="{{ form.get('admin_first','') }}"/>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Last Name</label>
+                <input type="text" name="admin_last" class="form-control"
+                       value="{{ form.get('admin_last','') }}"/>
+              </div>
+            </div>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label">Admin Username <span class="text-danger">*</span></label>
+                <input type="text" name="admin_username" class="form-control" placeholder="admin"
+                       value="{{ form.get('admin_username','') }}" required/>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Admin Password <span class="text-danger">*</span></label>
+                <input type="password" name="admin_password" class="form-control"
+                       placeholder="Min. 6 characters" required/>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-lg w-100 fw-semibold">
+              <i class="fa-solid fa-building-circle-check me-2"></i>Submit Registration
+            </button>
+            <p class="text-center text-muted small mt-3 mb-0">
+              <i class="fa-solid fa-clock me-1"></i>
+              Your account will be reviewed and activated by our team.
+            </p>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// Keep currency_symbol in sync with currency select
+const sel = document.getElementById('currencySelect');
+const sym = document.getElementById('currencySymbol');
+sel.addEventListener('change', function() {
+  sym.value = this.options[this.selectedIndex].dataset.symbol;
+});
+</script>
+{% endblock %}

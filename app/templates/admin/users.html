@@ -1,0 +1,45 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Users{% endblock %}
+{% block page_title_header %}User Management{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.new_user', slug=business.slug) }}" class="btn btn-dark btn-sm">
+    <i class="fa-solid fa-user-plus me-1"></i>Add User
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0 small">
+      <thead class="table-dark">
+        <tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="fw-semibold">{{ u.full_name }}</td>
+          <td><code>{{ u.username }}</code></td>
+          <td>{{ u.email or '—' }}</td>
+          <td>
+            {% if u.role == 'admin' %}<span class="badge bg-dark">Admin</span>
+            {% elif u.role == 'store_keeper' %}<span class="badge bg-primary">Store Keeper</span>
+            {% else %}<span class="badge bg-success">Sales Rep</span>{% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}<span class="badge bg-success">Active</span>
+            {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+          </td>
+          <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+          <td>
+            <a href="{{ url_for('admin.edit_user', slug=business.slug, user_id=u.id) }}"
+               class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-pen"></i></a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No users found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}POS Login — {{ business.name }}{% endblock %}
+{% block body %}
+<div class="min-vh-100 d-flex" style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)">
+  <div class="m-auto" style="width:100%;max-width:400px;padding:2rem">
+    <div class="text-center mb-4">
+      <div class="bg-success rounded-circle d-inline-flex p-3 mb-3">
+        <i class="fa-solid fa-cash-register fa-2x text-white"></i>
+      </div>
+      <h4 class="text-white fw-bold mb-1">{{ business.name }}</h4>
+      <p class="text-white-50">Sales Rep — Clock In</p>
+    </div>
+    <div class="card border-0 shadow-lg">
+      <div class="card-body p-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Username</label>
+            <div class="input-group">
+              <span class="input-group-text bg-success text-white border-success"><i class="fa-solid fa-user"></i></span>
+              <input type="text" name="username" class="form-control form-control-lg border-start-0" placeholder="Your username" required autofocus/>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Password</label>
+            <div class="input-group">
+              <span class="input-group-text bg-success text-white border-success"><i class="fa-solid fa-lock"></i></span>
+              <input type="password" name="password" class="form-control form-control-lg border-start-0" placeholder="Password" required/>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success btn-lg w-100 fw-bold">
+            <i class="fa-solid fa-right-to-bracket me-2"></i>Clock In &amp; Start Shift
+          </button>
+        </form>
+        <hr/>
+        <div class="text-center">
+          <small class="text-muted">Admin / Store Keeper? </small>
+          <a href="{{ url_for('auth.login', slug=business.slug) }}" class="small">Use admin login</a>
+        </div>
+      </div>
+    </div>
+    <div class="text-center mt-3">
+      <small class="text-white-50">Your clock-in time is recorded automatically.</small>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_title_header %}Dashboard{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="bg-success bg-opacity-10 rounded-circle p-3">
+          <i class="fa-solid fa-money-bill-wave fa-lg text-success"></i>
+        </div>
+        <div>
+          <div class="text-muted small">Today's Revenue</div>
+          <div class="fw-bold fs-5">{{ business.currency_symbol }}{{ "%.2f"|format(today.total_revenue) }}</div>
+          <div class="text-muted small">{{ today.total_count }} sales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+          <i class="fa-solid fa-calendar-week fa-lg text-primary"></i>
+        </div>
+        <div>
+          <div class="text-muted small">This Week</div>
+          <div class="fw-bold fs-5">{{ business.currency_symbol }}{{ "%.2f"|format(week.total_revenue) }}</div>
+          <div class="text-muted small">{{ week.total_count }} sales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+          <i class="fa-solid fa-calendar fa-lg text-warning"></i>
+        </div>
+        <div>
+          <div class="text-muted small">This Month</div>
+          <div class="fw-bold fs-5">{{ business.currency_symbol }}{{ "%.2f"|format(month.total_revenue) }}</div>
+          <div class="text-muted small">{{ month.total_count }} sales</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="bg-danger bg-opacity-10 rounded-circle p-3">
+          <i class="fa-solid fa-triangle-exclamation fa-lg text-danger"></i>
+        </div>
+        <div>
+          <div class="text-muted small">Low Stock Items</div>
+          <div class="fw-bold fs-5">{{ low_stock }}</div>
+          <div class="text-muted small">{{ total_products }} total products</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Secondary stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small mb-1">Stock Value</div>
+        <div class="fw-bold fs-5 text-success">{{ business.currency_symbol }}{{ "%.2f"|format(stock_value) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small mb-1">Active Sessions</div>
+        <div class="fw-bold fs-5 text-info">{{ active_sessions }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center">
+        <div class="text-muted small mb-1">Avg Sale (Today)</div>
+        <div class="fw-bold fs-5">{{ business.currency_symbol }}{{ "%.2f"|format(today.avg_sale) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart + Recent Sales -->
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0">Revenue — Last 7 Days</h6>
+      </div>
+      <div class="card-body">
+        <canvas id="revenueChart" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0">Quick Links</h6>
+      </div>
+      <div class="card-body d-flex flex-column gap-2">
+        <a href="{{ url_for('admin.new_product', slug=business.slug) }}" class="btn btn-outline-dark btn-sm text-start">
+          <i class="fa-solid fa-plus me-2"></i>Add Product
+        </a>
+        <a href="{{ url_for('admin.sales_history', slug=business.slug) }}?period=today" class="btn btn-outline-dark btn-sm text-start">
+          <i class="fa-solid fa-receipt me-2"></i>Today's Sales
+        </a>
+        <a href="{{ url_for('admin.reports', slug=business.slug) }}?period=month" class="btn btn-outline-dark btn-sm text-start">
+          <i class="fa-solid fa-chart-bar me-2"></i>Monthly Report
+        </a>
+        <a href="{{ url_for('admin.new_user', slug=business.slug) }}" class="btn btn-outline-dark btn-sm text-start">
+          <i class="fa-solid fa-user-plus me-2"></i>Add User
+        </a>
+        <a href="{{ url_for('pos.pos_home', slug=business.slug) }}" class="btn btn-success btn-sm text-start">
+          <i class="fa-solid fa-cash-register me-2"></i>Open POS
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Sales -->
+<div class="card border-0 shadow-sm mt-3">
+  <div class="card-header bg-white border-0 d-flex align-items-center pt-3">
+    <h6 class="fw-bold mb-0">Recent Sales</h6>
+    <a href="{{ url_for('admin.sales_history', slug=business.slug) }}" class="ms-auto small">View all</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th>Sale #</th><th>Seller</th><th>Items</th><th>Total</th><th>Payment</th><th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sale in recent_sales %}
+          <tr>
+            <td><a href="{{ url_for('admin.sale_detail', slug=business.slug, sale_id=sale.id) }}">{{ sale.sale_number }}</a></td>
+            <td>{{ sale.seller.full_name }}</td>
+            <td>{{ sale.items|length }}</td>
+            <td class="fw-semibold">{{ business.currency_symbol }}{{ "%.2f"|format(sale.total_amount) }}</td>
+            <td><span class="badge bg-secondary">{{ sale.payment_method }}</span></td>
+            <td>{{ sale.created_at.strftime('%H:%M') }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-3">No sales yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ctx = document.getElementById('revenueChart');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: {{ chart_labels | tojson }},
+    datasets: [{
+      label: 'Revenue',
+      data: {{ chart_data | tojson }},
+      borderColor: '#198754',
+      backgroundColor: 'rgba(25,135,84,0.1)',
+      tension: 0.4,
+      fill: true,
+      pointRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+</script>
+{% endblock %}

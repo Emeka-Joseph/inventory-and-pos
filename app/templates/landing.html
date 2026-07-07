@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}Eventry POS — Smart Inventory & Point of Sale{% endblock %}
+{% block body %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand fw-bold fs-4" href="/"><i class="fa-solid fa-store me-2"></i>Eventry POS</a>
+    <div class="ms-auto">
+      <a href="/register" class="btn btn-success me-2">Register Your Business</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="bg-dark text-white py-5">
+  <div class="container text-center py-5">
+    <h1 class="display-4 fw-bold mb-3">Smart Inventory &amp; POS<br>for Every Business</h1>
+    <p class="lead mb-4">Eventry POS simplifies stock management and point-of-sale operations<br>with powerful analytics for smarter business decisions.</p>
+    <a href="/register" class="btn btn-success btn-lg px-5 me-2">Get Started Free</a>
+    <a href="#features" class="btn btn-outline-light btn-lg px-5">See Features</a>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features" class="py-5 bg-light">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-5">Everything You Need</h2>
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body text-center p-4">
+            <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex p-3 mb-3">
+              <i class="fa-solid fa-cash-register fa-2x text-success"></i>
+            </div>
+            <h5 class="fw-bold">Point of Sale</h5>
+            <p class="text-muted">Fast, intuitive POS interface. Track which sales rep made each sale, when they clocked in and out.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body text-center p-4">
+            <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex p-3 mb-3">
+              <i class="fa-solid fa-boxes-stacked fa-2x text-primary"></i>
+            </div>
+            <h5 class="fw-bold">Inventory Management</h5>
+            <p class="text-muted">Record incoming stock, track levels, get low-stock alerts, and maintain immutable audit trails.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body text-center p-4">
+            <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex p-3 mb-3">
+              <i class="fa-solid fa-chart-line fa-2x text-warning"></i>
+            </div>
+            <h5 class="fw-bold">Analytics &amp; Reports</h5>
+            <p class="text-muted">Daily, weekly, monthly and yearly reports. Top products, sales by rep, revenue trends and more.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body text-center p-4">
+            <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex p-3 mb-3">
+              <i class="fa-solid fa-users fa-2x text-info"></i>
+            </div>
+            <h5 class="fw-bold">Multi-Role Access</h5>
+            <p class="text-muted">Admin, Store Keeper, and Sales Rep roles — each with appropriate access and controls.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body text-center p-4">
+            <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex p-3 mb-3">
+              <i class="fa-solid fa-building-user fa-2x text-danger"></i>
+            </div>
+            <h5 class="fw-bold">Multi-Business</h5>
+            <p class="text-muted">Each business has a private, isolated account. Register once and manage your entire operation.</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+          <div class="card-body text-center p-4">
+            <div class="bg-secondary bg-opacity-10 rounded-circle d-inline-flex p-3 mb-3">
+              <i class="fa-solid fa-clock-rotate-left fa-2x text-secondary"></i>
+            </div>
+            <h5 class="fw-bold">Audit Trail</h5>
+            <p class="text-muted">Price change history, immutable stock entries, and complete sales records for full accountability.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="py-5">
+  <div class="container">
+    <h2 class="text-center fw-bold mb-5">Three Portals, One System</h2>
+    <div class="row g-4 align-items-stretch">
+      <div class="col-md-4">
+        <div class="card h-100 border-dark">
+          <div class="card-header bg-dark text-white fw-bold"><i class="fa-solid fa-shield-halved me-2"></i>Admin Portal</div>
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Full system access</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Manage products &amp; prices</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>View all sales &amp; analytics</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Manage users &amp; roles</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Generate reports</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-primary">
+          <div class="card-header bg-primary text-white fw-bold"><i class="fa-solid fa-warehouse me-2"></i>Store Portal</div>
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Add new products</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Record incoming stock</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>View stock levels</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Immutable records</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Access POS</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-success">
+          <div class="card-header bg-success text-white fw-bold"><i class="fa-solid fa-cash-register me-2"></i>Sales Portal (POS)</div>
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Clock in / Clock out</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Make sales via POS</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Tracked per rep</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Print receipts</li>
+              <li class="mb-2"><i class="fa-solid fa-check text-success me-2"></i>Multiple payment types</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="bg-success text-white py-5">
+  <div class="container text-center">
+    <h2 class="fw-bold mb-3">Ready to simplify your business?</h2>
+    <p class="lead mb-4">Register your business in under 2 minutes.</p>
+    <a href="/register" class="btn btn-light btn-lg px-5 fw-bold">Register Now — It's Free</a>
+  </div>
+</section>
+
+<footer class="bg-dark text-secondary py-4 text-center">
+  <p class="mb-0">&copy; 2026 Eventry POS. Built with Flask &amp; Bootstrap.</p>
+</footer>
+{% endblock %}

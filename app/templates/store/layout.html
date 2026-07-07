@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}{% block page_title %}Store{% endblock %} — {{ business.name }}{% endblock %}
+{% block body %}
+<!-- Mobile topbar -->
+<div class="mobile-topbar" style="background:#0d6efd;">
+  <button class="btn btn-sm btn-outline-light" id="sidebarToggleBtn" aria-label="Toggle menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+  <span class="text-white fw-bold small text-truncate">{{ business.name }} &mdash; Store</span>
+</div>
+
+<!-- Overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="d-flex" id="wrapper">
+  <div class="bg-primary text-white app-sidebar d-flex flex-column flex-shrink-0 p-3" id="appSidebar">
+    <a href="{{ url_for('store.dashboard', slug=business.slug) }}" class="text-white text-decoration-none mb-3">
+      <i class="fa-solid fa-warehouse me-2"></i><span class="fw-bold fs-6">{{ business.name }}</span>
+    </a>
+    <small class="text-white-50 d-block">Store Portal</small>
+    {% if current_sub %}
+    <span class="badge mt-1 mb-2 {{ current_sub.features.badge_class }}">{{ current_sub.features.label }}</span>
+    {% endif %}
+    <hr class="border-light my-1"/>
+    <ul class="nav nav-pills flex-column mb-auto mt-2 gap-1">
+      <li>
+        <a href="{{ url_for('store.dashboard', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint == 'store.dashboard' %}active bg-white bg-opacity-25{% endif %}">
+          <i class="fa-solid fa-gauge me-2"></i>Dashboard
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('store.products', slug=business.slug) }}"
+           class="nav-link text-white {% if 'product' in request.endpoint %}active bg-white bg-opacity-25{% endif %}">
+          <i class="fa-solid fa-box me-2"></i>Products
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('store.stock_entry', slug=business.slug) }}"
+           class="nav-link text-white {% if 'stock' in request.endpoint %}active bg-white bg-opacity-25{% endif %}">
+          <i class="fa-solid fa-truck-ramp-box me-2"></i>Record Stock
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('store.add_product', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint == 'store.add_product' %}active bg-white bg-opacity-25{% endif %}">
+          <i class="fa-solid fa-plus-circle me-2"></i>Add Product
+        </a>
+      </li>
+      <li><hr class="border-light my-1"/></li>
+      <li>
+        <a href="{{ url_for('pos.pos_home', slug=business.slug) }}"
+           class="nav-link text-white">
+          <i class="fa-solid fa-cash-register me-2"></i>Go to POS
+        </a>
+      </li>
+    </ul>
+    <hr class="border-light"/>
+    <div class="dropdown">
+      <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fa-solid fa-circle-user fa-lg me-2"></i>
+        <small>{{ current_user.full_name }}</small>
+      </a>
+      <ul class="dropdown-menu dropdown-menu-dark">
+        <li><a class="dropdown-item" href="{{ url_for('auth.logout', slug=business.slug) }}"><i class="fa-solid fa-right-from-bracket me-2"></i>Logout</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="flex-grow-1 bg-light" id="mainContent">
+    <div class="bg-white border-bottom px-4 py-3 d-flex align-items-center">
+      <h5 class="mb-0 fw-bold">{% block page_title_header %}{% endblock %}</h5>
+      <div class="ms-auto">{% block page_actions %}{% endblock %}</div>
+    </div>
+    {# subscription expiry banner (same logic as admin layout) #}
+    {% if current_sub %}
+      {% set days = current_sub.days_until_expiry %}
+      {% if current_sub.status == 'trialing' and days is not none and days <= 5 %}
+      <div class="alert alert-warning mb-0 rounded-0 border-0 py-2 px-4 small" role="alert">
+        <i class="fa-solid fa-clock me-1"></i>
+        Free trial expires {% if days == 0 %}today{% elif days == 1 %}tomorrow{% else %}in {{ days }} days{% endif %}.
+        Contact your admin to upgrade.
+      </div>
+      {% elif current_sub.status == 'expired' %}
+      <div class="alert alert-danger mb-0 rounded-0 border-0 py-2 px-4 small" role="alert">
+        <i class="fa-solid fa-circle-xmark me-1"></i>
+        Subscription expired — some features restricted. Contact your admin.
+      </div>
+      {% endif %}
+    {% endif %}
+    <div class="p-3 p-md-4">{% block content %}{% endblock %}</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const btn     = document.getElementById('sidebarToggleBtn');
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+
+  function openSidebar() {
+    sidebar.classList.add('sidebar-open');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('sidebar-open');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  btn.addEventListener('click', function() {
+    sidebar.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+  });
+  overlay.addEventListener('click', closeSidebar);
+
+  sidebar.querySelectorAll('.nav-link').forEach(function(link) {
+    link.addEventListener('click', function() {
+      if (window.innerWidth < 992) closeSidebar();
+    });
+  });
+})();
+</script>
+{% endblock %}

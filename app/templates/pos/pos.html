@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+{% block title %}POS — {{ business.name }}{% endblock %}
+{% block head %}
+<style>
+body { overflow: hidden; }
+#pos-wrapper { height: 100vh; display: flex; flex-direction: column; }
+#pos-topbar { background: #1a1a2e; color: #fff; padding: 0.4rem 1rem; display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+#pos-scanbar { background: #0f3460; padding: 0.4rem 1rem; display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; border-bottom: 2px solid #198754; }
+#pos-body { display: flex; flex: 1; overflow: hidden; }
+#products-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #f8f9fa; }
+#product-search-bar { padding: 0.6rem 1rem; background: #fff; border-bottom: 1px solid #dee2e6; }
+#cat-tabs { padding: 0.4rem 1rem; background: #fff; border-bottom: 1px solid #dee2e6; display: flex; gap: 0.4rem; flex-wrap: wrap; }
+#product-grid { flex: 1; overflow-y: auto; padding: 0.75rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 0.6rem; align-content: start; }
+.product-card { background: #fff; border: 2px solid #e9ecef; border-radius: 10px; padding: 0.75rem; cursor: pointer; transition: all 0.12s; text-align: center; user-select: none; }
+.product-card:hover { border-color: #198754; background: #f0fff4; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(25,135,84,0.15); }
+.product-card.out-of-stock { opacity: 0.45; cursor: not-allowed; }
+.product-card.scan-highlight { border-color: #198754; background: #d1f7e0; animation: scanPulse 0.6s ease-out; }
+@keyframes scanPulse { 0%{transform:scale(1.06)} 100%{transform:scale(1)} }
+.prod-name { font-weight: 600; font-size: 0.8rem; margin-bottom: 0.2rem; word-break: break-word; }
+.prod-barcode { color: #adb5bd; font-size: 0.65rem; font-family: monospace; margin-bottom: 0.15rem; }
+.prod-price { color: #198754; font-weight: 700; font-size: 0.85rem; }
+.prod-stock { color: #6c757d; font-size: 0.7rem; }
+#cart-panel { width: 350px; flex-shrink: 0; background: #fff; border-left: 1px solid #dee2e6; display: flex; flex-direction: column; }
+#cart-header { padding: 0.6rem 1rem; background: #1a1a2e; color: #fff; font-weight: 600; }
+#cart-items { flex: 1; overflow-y: auto; padding: 0.4rem; }
+.cart-item { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.5rem; border-radius: 8px; margin-bottom: 0.3rem; background: #f8f9fa; border: 1px solid #e9ecef; }
+.cart-item .cart-name { flex: 1; font-size: 0.82rem; font-weight: 600; }
+.cart-item .cart-bc { font-size: 0.65rem; color: #adb5bd; font-family: monospace; }
+.cart-item .cart-qty { display: flex; align-items: center; gap: 0.2rem; }
+.qty-btn { width: 22px; height: 22px; border: 1px solid #dee2e6; background: #fff; border-radius: 4px; cursor: pointer; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
+.qty-btn:hover { background: #198754; color: #fff; border-color: #198754; }
+.cart-sub { font-size: 0.78rem; font-weight: 600; color: #198754; min-width: 65px; text-align: right; }
+.remove-btn { color: #dc3545; cursor: pointer; font-size: 0.75rem; }
+#cart-totals { padding: 0.6rem 1rem; border-top: 1px solid #dee2e6; background: #f8f9fa; }
+#cart-actions { padding: 0.6rem 1rem; background: #fff; border-top: 1px solid #dee2e6; }
+/* Scan toast */
+#scanToast { position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); z-index:9999; min-width:300px; display:none; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div id="pos-wrapper">
+
+  <!-- Top bar -->
+  <div id="pos-topbar">
+    <i class="fa-solid fa-cash-register text-success fa-lg"></i>
+    <span class="fw-bold">{{ business.name }}</span>
+    <span class="badge bg-success">POS</span>
+    {% if active_session %}
+    <span class="text-white-50 small"><i class="fa-solid fa-clock me-1"></i>Shift: {{ active_session.clock_in.strftime('%H:%M') }}</span>
+    {% endif %}
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <span class="text-white-50 small"><i class="fa-solid fa-user me-1"></i>{{ current_user.full_name }}</span>
+      <a href="{{ url_for('pos.pos_logout', slug=business.slug) }}" class="btn btn-outline-light btn-sm"
+         onclick="return confirm('Clock out and end your shift?')">
+        <i class="fa-solid fa-right-from-bracket me-1"></i>
+        {{ 'Clock Out' if current_user.role == 'sales_rep' else 'Logout' }}
+      </a>
+    </div>
+  </div>
+
+  <!-- Barcode scanner bar -->
+  <div id="pos-scanbar">
+    <i class="fa-solid fa-barcode text-success fa-lg"></i>
+    <div class="flex-grow-1" style="max-width:420px">
+      <input type="text" id="barcodeInput"
+             class="form-control form-control-sm font-monospace bg-dark text-white border-secondary"
+             placeholder="Scan barcode here — or type barcode + Enter"
+             autocomplete="off" autocorrect="off" spellcheck="false"/>
+    </div>
+    <span class="text-white-50 small" id="scanFeedback">Ready to scan</span>
+    <button type="button" class="btn btn-outline-light btn-sm ms-1" id="posCameraBtn" title="Use camera to scan barcode">
+      <i class="fa-solid fa-camera"></i>
+    </button>
+  </div>
+
+  <div id="pos-body">
+    <!-- Products panel -->
+    <div id="products-panel">
+      <div id="product-search-bar">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
+          <input type="text" id="searchInput" class="form-control" placeholder="Search by name..."/>
+        </div>
+      </div>
+      <div id="cat-tabs">
+        <button class="btn btn-sm btn-success cat-btn" data-cat="">All</button>
+        {% for cat in categories %}
+        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="{{ cat.id }}">{{ cat.name }}</button>
+        {% endfor %}
+      </div>
+      <div id="product-grid">
+        {% for p in products %}
+        <div class="product-card {% if p.quantity_in_stock <= 0 %}out-of-stock{% endif %}"
+             id="card-{{ p.id }}"
+             data-id="{{ p.id }}"
+             data-name="{{ p.name }}"
+             data-barcode="{{ p.barcode }}"
+             data-price="{{ p.unit_price }}"
+             data-stock="{{ p.quantity_in_stock }}"
+             data-cat="{{ p.category_id or '' }}"
+             onclick="addToCart(this)">
+          <div class="prod-name">{{ p.name }}</div>
+          <div class="prod-barcode">{{ p.barcode }}</div>
+          <div class="prod-price">{{ business.currency_symbol }}{{ "%.2f"|format(p.unit_price) }}</div>
+          <div class="prod-stock">{{ p.quantity_in_stock }} {{ p.unit }}</div>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5" style="grid-column:1/-1">
+          <i class="fa-solid fa-box-open fa-3x mb-2"></i><br/>No products available.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Cart panel -->
+    <div id="cart-panel">
+      <div id="cart-header">
+        <i class="fa-solid fa-cart-shopping me-2"></i>Cart
+        <button class="btn btn-sm btn-outline-light float-end" onclick="clearCart()">
+          <i class="fa-solid fa-trash me-1"></i>Clear
+        </button>
+      </div>
+      <div id="cart-items"></div>
+      <div id="cart-totals">
+        <div class="d-flex justify-content-between mb-1 small"><span>Subtotal</span><span id="subtotalDisplay">{{ business.currency_symbol }}0.00</span></div>
+        <div class="d-flex justify-content-between align-items-center mb-1 small">
+          <span>Discount</span>
+          <div class="input-group input-group-sm" style="width:110px">
+            <span class="input-group-text">{{ business.currency_symbol }}</span>
+            <input type="number" id="discountInput" class="form-control" value="0" min="0" step="0.01"/>
+          </div>
+        </div>
+        <hr class="my-2"/>
+        <div class="d-flex justify-content-between fw-bold">
+          <span>TOTAL</span><span id="totalDisplay" class="text-success fs-5">{{ business.currency_symbol }}0.00</span>
+        </div>
+      </div>
+      <div id="cart-actions">
+        <button class="btn btn-success btn-lg fw-bold w-100" onclick="openCheckout()" id="checkoutBtn" disabled>
+          <i class="fa-solid fa-credit-card me-2"></i>Checkout
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scan toast notification -->
+<div id="scanToast" class="alert shadow-lg mb-0 py-2 px-3" role="alert"></div>
+
+<!-- Checkout Modal -->
+<div class="modal fade" id="checkoutModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-credit-card me-2"></i>Checkout</h5>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="bg-light rounded p-3 text-center">
+              <div class="text-muted small">Total Amount</div>
+              <div class="fw-bold fs-3 text-success" id="modalTotal">{{ business.currency_symbol }}0.00</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Payment Method</label>
+            <select id="paymentMethod" class="form-select" onchange="updateChange()">
+              <option value="cash">Cash</option>
+              <option value="card">Card / POS Terminal</option>
+              <option value="transfer">Bank Transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="col-md-6" id="cashFields">
+            <label class="form-label fw-semibold">Amount Tendered</label>
+            <div class="input-group">
+              <span class="input-group-text">{{ business.currency_symbol }}</span>
+              <input type="number" id="amountTendered" class="form-control form-control-lg"
+                     step="0.01" min="0" oninput="updateChange()" placeholder="0.00"/>
+            </div>
+          </div>
+          <div class="col-md-6" id="changeRow">
+            <label class="form-label fw-semibold">Change</label>
+            <div class="input-group">
+              <span class="input-group-text">{{ business.currency_symbol }}</span>
+              <input type="text" id="changeDisplay" class="form-control form-control-lg fw-bold text-success" readonly value="0.00"/>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Customer Name</label>
+            <input type="text" id="customerName" class="form-control" placeholder="Optional"/>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success btn-lg fw-bold px-4" onclick="processPayment()">
+          <i class="fa-solid fa-check me-2"></i>Complete Sale
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SYMBOL = '{{ business.currency_symbol }}';
+const SLUG   = '{{ business.slug }}';
+const CSRF   = '{{ csrf_token() }}';
+let cart = {};
+
+// ── Money helpers ─────────────────────────────────────────────────────────────
+function fmt(n) { return SYMBOL + parseFloat(n).toFixed(2); }
+
+// ── Cart ──────────────────────────────────────────────────────────────────────
+function addToCart(el) {
+  if (el.classList.contains('out-of-stock')) return;
+  addToCartById(el.dataset.id, el.dataset.name, parseFloat(el.dataset.price),
+                parseInt(el.dataset.stock), el.dataset.barcode);
+}
+
+function addToCartById(id, name, price, stock, barcode) {
+  id = String(id);
+  if (cart[id]) {
+    if (cart[id].qty >= stock) {
+      showScanToast(`⚠ Max stock reached for ${name}`, 'warning'); return;
+    }
+    cart[id].qty++;
+  } else {
+    cart[id] = { id, name, price, qty: 1, stock, barcode };
+  }
+  const card = document.getElementById('card-' + id);
+  if (card) { card.classList.add('scan-highlight'); setTimeout(() => card.classList.remove('scan-highlight'), 600); }
+  renderCart();
+}
+
+function changeQty(id, delta) {
+  if (!cart[id]) return;
+  cart[id].qty += delta;
+  if (cart[id].qty <= 0) delete cart[id];
+  else if (cart[id].qty > cart[id].stock) cart[id].qty = cart[id].stock;
+  renderCart();
+}
+
+function removeItem(id) { delete cart[id]; renderCart(); }
+function clearCart() { cart = {}; renderCart(); }
+
+function renderCart() {
+  const items = Object.values(cart);
+  const el = document.getElementById('cart-items');
+  document.getElementById('checkoutBtn').disabled = !items.length;
+
+  if (!items.length) {
+    el.innerHTML = '<div class="text-center text-muted py-4 small"><i class="fa-solid fa-cart-shopping fa-2x mb-2 d-block"></i>Cart is empty</div>';
+    updateTotals(); return;
+  }
+
+  el.innerHTML = items.map(item => `
+    <div class="cart-item">
+      <div>
+        <div class="cart-name">${item.name}</div>
+        <div class="cart-bc">${item.barcode}</div>
+      </div>
+      <div class="cart-qty">
+        <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
+        <span class="fw-bold px-1">${item.qty}</span>
+        <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
+      </div>
+      <div class="cart-sub">${fmt(item.price * item.qty)}</div>
+      <i class="fa-solid fa-xmark remove-btn" onclick="removeItem('${item.id}')"></i>
+    </div>`).join('');
+  updateTotals();
+}
+
+function getSubtotal() { return Object.values(cart).reduce((s,i) => s + i.price * i.qty, 0); }
+function getDiscount() { return Math.max(0, parseFloat(document.getElementById('discountInput').value) || 0); }
+
+function updateTotals() {
+  const sub = getSubtotal(), disc = getDiscount(), total = Math.max(0, sub - disc);
+  document.getElementById('subtotalDisplay').textContent = fmt(sub);
+  document.getElementById('totalDisplay').textContent = fmt(total);
+}
+document.getElementById('discountInput').addEventListener('input', updateTotals);
+
+// ── Barcode scanner input ─────────────────────────────────────────────────────
+const barcodeInput = document.getElementById('barcodeInput');
+const scanFeedback = document.getElementById('scanFeedback');
+let scanTimer = null;
+
+// Keep barcode field focused whenever the POS body is clicked (unless a modal/form is open)
+document.getElementById('pos-body').addEventListener('click', function(e) {
+  if (!document.querySelector('.modal.show') && e.target.tagName !== 'BUTTON' &&
+      e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+    barcodeInput.focus();
+  }
+});
+
+// Global keydown: redirect stray keypresses to barcode input
+document.addEventListener('keydown', function(e) {
+  if (document.querySelector('.modal.show')) return;
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    barcodeInput.focus();
+  }
+});
+
+barcodeInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const code = this.value.trim();
+    if (code) { processBarcode(code); this.value = ''; }
+  }
+});
+
+// Scanner speed detection: characters arrive in < 80ms → auto-process
+barcodeInput.addEventListener('input', function() {
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    const code = this.value.trim();
+    if (code.length >= 3) { processBarcode(code); this.value = ''; }
+  }, 80);
+});
+
+async function processBarcode(code) {
+  scanFeedback.textContent = `Looking up: ${code}`;
+  try {
+    const res = await fetch(`/${SLUG}/pos/barcode?code=${encodeURIComponent(code)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.product) {
+        const p = data.product;
+        addToCartById(p.id, p.name, p.unit_price, p.quantity_in_stock, p.barcode);
+        scanFeedback.innerHTML = `<span class="text-success">✓ Added: ${p.name}</span>`;
+        showScanToast(`✓ ${p.name} added to cart`, 'success');
+      } else {
+        scanFeedback.innerHTML = `<span class="text-danger">✗ Not found: ${code}</span>`;
+        showScanToast(`✗ No product for barcode: ${code}`, 'danger');
+      }
+    } else {
+      const data = await res.json();
+      scanFeedback.innerHTML = `<span class="text-danger">✗ ${data.error || 'Not found'}</span>`;
+      showScanToast(`✗ ${data.error || 'Product not found'}`, 'danger');
+    }
+  } catch {
+    scanFeedback.innerHTML = '<span class="text-danger">✗ Network error</span>';
+  }
+  setTimeout(() => { scanFeedback.textContent = 'Ready to scan'; }, 2500);
+}
+
+function showScanToast(msg, type) {
+  const t = document.getElementById('scanToast');
+  t.className = `alert alert-${type} shadow-lg mb-0 py-2 px-3`;
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = 'none'; }, 2000);
+}
+
+// ── Category filter ───────────────────────────────────────────────────────────
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.cat-btn').forEach(b => {
+      b.classList.remove('btn-success'); b.classList.add('btn-outline-secondary');
+    });
+    this.classList.remove('btn-outline-secondary'); this.classList.add('btn-success');
+    const cat = this.dataset.cat;
+    document.querySelectorAll('.product-card').forEach(c => {
+      c.style.display = (!cat || c.dataset.cat === cat) ? '' : 'none';
+    });
+    barcodeInput.focus();
+  });
+});
+
+// ── Text search ───────────────────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.product-card').forEach(c => {
+    c.style.display = (c.dataset.name.toLowerCase().includes(q) || c.dataset.barcode.includes(q)) ? '' : 'none';
+  });
+});
+
+// ── Checkout ──────────────────────────────────────────────────────────────────
+function openCheckout() {
+  if (!Object.keys(cart).length) return;
+  const total = Math.max(0, getSubtotal() - getDiscount());
+  document.getElementById('modalTotal').textContent = fmt(total);
+  document.getElementById('amountTendered').value = '';
+  document.getElementById('changeDisplay').value = '0.00';
+  document.getElementById('customerName').value = '';
+  document.getElementById('paymentMethod').value = 'cash';
+  document.getElementById('cashFields').style.display = '';
+  document.getElementById('changeRow').style.display = '';
+  new bootstrap.Modal(document.getElementById('checkoutModal')).show();
+}
+
+function updateChange() {
+  const method = document.getElementById('paymentMethod').value;
+  const isCash = method === 'cash';
+  document.getElementById('cashFields').style.display = isCash ? '' : 'none';
+  document.getElementById('changeRow').style.display = isCash ? '' : 'none';
+  if (isCash) {
+    const total = Math.max(0, getSubtotal() - getDiscount());
+    const tendered = parseFloat(document.getElementById('amountTendered').value) || 0;
+    document.getElementById('changeDisplay').value = Math.max(0, tendered - total).toFixed(2);
+  }
+}
+
+async function processPayment() {
+  const items = Object.values(cart);
+  if (!items.length) return;
+  const method = document.getElementById('paymentMethod').value;
+  const total = Math.max(0, getSubtotal() - getDiscount());
+  if (method === 'cash') {
+    const tendered = parseFloat(document.getElementById('amountTendered').value) || 0;
+    if (tendered < total) { alert('Amount tendered is less than total.'); return; }
+  }
+  const btn = document.querySelector('#checkoutModal .btn-success');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+  const payload = {
+    items: items.map(i => ({ product_id: i.id, quantity: i.qty })),
+    payment_method: method,
+    amount_tendered: method === 'cash' ? (parseFloat(document.getElementById('amountTendered').value) || 0) : total,
+    discount: getDiscount(),
+    customer_name: document.getElementById('customerName').value,
+  };
+  try {
+    const res = await fetch(`/${SLUG}/pos/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
+      clearCart();
+      if (confirm(`Sale complete!\n#: ${data.sale_number}\nTotal: ${fmt(data.total)}\nChange: ${fmt(data.change)}\n\nPrint receipt?`)) {
+        window.open(data.receipt_url, '_blank');
+      }
+      barcodeInput.focus();
+    } else { alert('Error: ' + (data.error || 'Unknown error')); }
+  } catch { alert('Network error. Please try again.'); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Complete Sale'; }
+}
+
+// ── Camera scan button ────────────────────────────────────────────────────────
+document.getElementById('posCameraBtn').addEventListener('click', function() {
+  openCameraScanner(function(code) {
+    processBarcode(code);
+  });
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderCart();
+barcodeInput.focus();
+</script>
+{% endblock %}

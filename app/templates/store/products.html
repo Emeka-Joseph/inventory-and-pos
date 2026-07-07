@@ -1,0 +1,95 @@
+{% extends 'store/layout.html' %}
+{% block page_title %}Products{% endblock %}
+{% block page_title_header %}Products{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('store.add_product', slug=business.slug) }}" class="btn btn-primary btn-sm">
+    <i class="fa-solid fa-plus me-1"></i>Add Product
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-center" method="GET">
+      <div class="col-md-5">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
+          <input type="text" name="q" class="form-control" placeholder="Search products..." value="{{ q }}"/>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <select name="cat" class="form-select form-select-sm">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}" {% if selected_cat == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary btn-sm">Filter</button>
+        <a href="{{ url_for('store.products', slug=business.slug) }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-primary">
+          <tr>
+            <th>Product</th>
+            <th><i class="fa-solid fa-barcode me-1"></i>Barcode</th>
+            <th>Selling Price</th>
+            <th>Stock</th>
+            <th>Reorder Level</th>
+            <th><i class="fa-solid fa-calendar-xmark me-1"></i>Expiry</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr class="{% if p.is_low_stock %}table-warning{% endif %}{% if p.expiry_status == 'expired' %} table-danger{% endif %}">
+            <td>
+              <div class="fw-semibold">{{ p.name }}</div>
+            </td>
+            <td><code class="small">{{ p.barcode }}</code></td>
+            <td class="fw-semibold">{{ business.currency_symbol }}{{ "%.2f"|format(p.unit_price) }}</td>
+            <td>
+              <span class="{% if p.is_low_stock %}text-danger fw-bold{% else %}text-success{% endif %}">
+                {{ p.quantity_in_stock }} {{ p.unit }}
+              </span>
+              {% if p.is_low_stock %}<span class="badge bg-warning text-dark ms-1">Low</span>{% endif %}
+            </td>
+            <td>{{ p.reorder_level }}</td>
+            <td>
+              {% if p.expiry_date %}
+                <div class="text-nowrap">{{ p.expiry_date.strftime('%d %b %Y') }}</div>
+                {% if p.expiry_status == 'expired' %}
+                  <span class="badge badge-expired">Expired</span>
+                {% elif p.expiry_status == 'expiring_soon' %}
+                  <span class="badge badge-expiring">Exp. Soon</span>
+                {% else %}
+                  <span class="badge badge-exp-ok">OK</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('store.stock_entry', slug=business.slug) }}?product_id={{ p.id }}"
+                 class="btn btn-outline-primary btn-sm">
+                <i class="fa-solid fa-plus me-1"></i>Add Stock
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No products found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

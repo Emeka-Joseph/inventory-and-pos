@@ -1,0 +1,73 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+*.egg-link
+.installed.cfg
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+.env.bak
+
+# Flask / instance
+instance/
+.webassets-cache
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads & user content
+app/static/uploads/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Migrations (keep if using Flask-Migrate)
+# migrations/
+
+# Logs
+*.log
+logs/
+
+# Node (if ever added)
+node_modules/
+npm-debug.log*

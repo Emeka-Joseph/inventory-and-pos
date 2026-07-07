@@ -1,0 +1,86 @@
+/* ── General ──────────────────────────────────────────────────────────────── */
+.card  { border-radius: 12px; }
+.btn   { border-radius: 8px; }
+.table th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ── Desktop sidebar ────────────────────────────────────────────────────── */
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+  width: 240px;
+}
+.app-sidebar .nav-link {
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+.app-sidebar .nav-link:hover { background: rgba(255,255,255,0.12) !important; }
+
+/* ── Mobile topbar (hidden on desktop) ──────────────────────────────────── */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 50px;
+  z-index: 1035;
+  background: #212529;
+  align-items: center;
+  padding: 0 0.75rem;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* ── Sidebar overlay (dark backdrop on mobile) ─────────────────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 1040;
+  cursor: pointer;
+}
+.sidebar-overlay.active { display: block; }
+
+/* ── Responsive: mobile behaviour ──────────────────────────────────────── */
+@media (max-width: 991.98px) {
+  .mobile-topbar { display: flex; }
+
+  .app-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform 0.26s ease;
+    overflow-y: auto;
+    /* Keep background visible — override any sticky/flex resets */
+    min-height: 100vh !important;
+  }
+  .app-sidebar.sidebar-open { transform: translateX(0); }
+
+  /* Push content down so mobile topbar doesn't overlap */
+  #mainContent { padding-top: 50px; }
+}
+
+/* ── Toast notifications ────────────────────────────────────────────────── */
+.toast-container  { pointer-events: none; }
+.toast            { pointer-events: auto; min-width: 260px; }
+
+/* ── Expiry badges ──────────────────────────────────────────────────────── */
+.badge-expired      { background: #dc3545; color: #fff; }
+.badge-expiring     { background: #fd7e14; color: #fff; }
+.badge-exp-ok       { background: #198754; color: #fff; }
+
+/* ── Camera modal video ─────────────────────────────────────────────────── */
+#cameraScanReader video { width: 100% !important; border-radius: 8px; }
+#cameraScanReader       { min-height: 220px; background: #000; border-radius: 8px; }
+
+/* ── Print ──────────────────────────────────────────────────────────────── */
+@media print {
+  .app-sidebar, .mobile-topbar, .bg-white.border-bottom, .toast-container { display: none !important; }
+}

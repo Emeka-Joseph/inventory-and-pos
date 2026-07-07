@@ -1,0 +1,100 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Sales History{% endblock %}
+{% block page_title_header %}Sales History{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-center" method="GET">
+      <div class="col-auto">
+        <div class="btn-group btn-group-sm" role="group">
+          {% for p in ['today','week','month','year'] %}
+          <a href="{{ url_for('admin.sales_history', slug=business.slug) }}?period={{ p }}"
+             class="btn {% if period == p %}btn-dark{% else %}btn-outline-dark{% endif %}">{{ p.title() }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <select name="user_id" class="form-select form-select-sm">
+          <option value="">All Sellers</option>
+          {% for s in sellers %}
+          <option value="{{ s.id }}" {% if selected_user == s.id %}selected{% endif %}>{{ s.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="payment" class="form-select form-select-sm">
+          <option value="">All Payments</option>
+          {% for pm in ['cash','card','transfer','other'] %}
+          <option value="{{ pm }}" {% if selected_payment == pm %}selected{% endif %}>{{ pm.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <input type="hidden" name="period" value="{{ period }}"/>
+      <div class="col-auto">
+        <button class="btn btn-dark btn-sm">Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm text-center py-2">
+      <div class="text-muted small">Total Revenue</div>
+      <div class="fw-bold fs-5 text-success">{{ business.currency_symbol }}{{ "%.2f"|format(summary.total_revenue) }}</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm text-center py-2">
+      <div class="text-muted small">Transactions</div>
+      <div class="fw-bold fs-5">{{ summary.total_count }}</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card border-0 shadow-sm text-center py-2">
+      <div class="text-muted small">Avg Sale</div>
+      <div class="fw-bold fs-5">{{ business.currency_symbol }}{{ "%.2f"|format(summary.avg_sale) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-dark">
+          <tr>
+            <th>Sale #</th><th>Seller</th><th>Customer</th><th>Items</th>
+            <th>Subtotal</th><th>Discount</th><th>Total</th><th>Payment</th><th>Date/Time</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sales %}
+          <tr>
+            <td class="fw-semibold">{{ s.sale_number }}</td>
+            <td>{{ s.seller.full_name }}</td>
+            <td>{{ s.customer_name or '—' }}</td>
+            <td>{{ s.items|length }}</td>
+            <td>{{ business.currency_symbol }}{{ "%.2f"|format(s.subtotal) }}</td>
+            <td>{% if s.discount > 0 %}<span class="text-danger">-{{ business.currency_symbol }}{{ "%.2f"|format(s.discount) }}</span>{% else %}—{% endif %}</td>
+            <td class="fw-bold">{{ business.currency_symbol }}{{ "%.2f"|format(s.total_amount) }}</td>
+            <td><span class="badge bg-secondary">{{ s.payment_method }}</span></td>
+            <td>{{ s.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>
+              <a href="{{ url_for('admin.sale_detail', slug=business.slug, sale_id=s.id) }}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-eye"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="10" class="text-center text-muted py-4">No sales in this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

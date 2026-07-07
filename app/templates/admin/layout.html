@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}{% block page_title %}Admin{% endblock %} — {{ business.name }}{% endblock %}
+{% block body %}
+<!-- Mobile topbar (visible only < lg) -->
+<div class="mobile-topbar">
+  <button class="btn btn-sm btn-outline-light" id="sidebarToggleBtn" aria-label="Toggle menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+  <span class="text-white fw-bold small text-truncate">{{ business.name }} &mdash; Admin</span>
+</div>
+
+<!-- Dark overlay when sidebar is open on mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="d-flex" id="wrapper">
+  <!-- Sidebar -->
+  <div class="bg-dark text-white app-sidebar d-flex flex-column flex-shrink-0 p-3" id="appSidebar">
+    <a href="{{ url_for('admin.dashboard', slug=business.slug) }}" class="text-white text-decoration-none mb-3">
+      <i class="fa-solid fa-store me-2"></i><span class="fw-bold fs-6">{{ business.name }}</span>
+    </a>
+    <small class="text-secondary d-block">Admin Portal</small>
+    {% if current_sub %}
+    <span class="badge mt-1 mb-2 {{ current_sub.features.badge_class }}">
+      {{ current_sub.features.label }}
+    </span>
+    {% endif %}
+    <hr class="border-secondary my-1"/>
+    <ul class="nav nav-pills flex-column mb-auto mt-2 gap-1">
+      <li>
+        <a href="{{ url_for('admin.dashboard', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint == 'admin.dashboard' %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-gauge-high me-2"></i>Dashboard
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.products', slug=business.slug) }}"
+           class="nav-link text-white {% if 'product' in request.endpoint %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-box me-2"></i>Products
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.stock', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint == 'admin.stock' %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-warehouse me-2"></i>Stock
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.sales_history', slug=business.slug) }}"
+           class="nav-link text-white {% if 'sales' in request.endpoint %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-receipt me-2"></i>Sales History
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.reports', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint == 'admin.reports' %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-chart-bar me-2"></i>Reports
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.sessions', slug=business.slug) }}"
+           class="nav-link text-white {% if 'session' in request.endpoint %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-clock me-2"></i>Work Sessions
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.price_history', slug=business.slug) }}"
+           class="nav-link text-white {% if 'price' in request.endpoint %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-tag me-2"></i>Price History
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.users', slug=business.slug) }}"
+           class="nav-link text-white {% if 'user' in request.endpoint %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-users me-2"></i>Users
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('admin.upgrade', slug=business.slug) }}"
+           class="nav-link {% if request.endpoint == 'admin.upgrade' %}active bg-warning text-dark{% else %}text-warning{% endif %}">
+          <i class="fa-solid fa-arrow-up me-2"></i>Upgrade Plan
+        </a>
+      </li>
+    </ul>
+    <hr class="border-secondary"/>
+    <div class="dropdown">
+      <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fa-solid fa-circle-user fa-lg me-2"></i>
+        <small>{{ current_user.full_name }}</small>
+      </a>
+      <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+        <li><a class="dropdown-item" href="{{ url_for('pos.pos_home', slug=business.slug) }}"><i class="fa-solid fa-cash-register me-2"></i>Go to POS</a></li>
+        <li><hr class="dropdown-divider"/></li>
+        <li><a class="dropdown-item" href="{{ url_for('auth.logout', slug=business.slug) }}"><i class="fa-solid fa-right-from-bracket me-2"></i>Logout</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="flex-grow-1 bg-light" id="mainContent">
+    <div class="bg-white border-bottom px-4 py-3 d-flex align-items-center">
+      <h5 class="mb-0 fw-bold">{% block page_title_header %}{% endblock %}</h5>
+      <div class="ms-auto">{% block page_actions %}{% endblock %}</div>
+    </div>
+
+    {# ── Subscription banner ──────────────────────────────────────────────── #}
+    {% if current_sub %}
+      {% set days = current_sub.days_until_expiry %}
+      {% if current_sub.status == 'trialing' and days is not none and days <= 5 %}
+      <div class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 py-2 px-4 small" role="alert">
+        <i class="fa-solid fa-clock me-1"></i>
+        Your <strong>free trial</strong> expires
+        {% if days == 0 %}today{% elif days == 1 %}tomorrow{% else %}in {{ days }} days{% endif %}.
+        <a href="{{ url_for('admin.upgrade', slug=business.slug) }}" class="alert-link ms-1">Upgrade now</a>
+        to keep all features.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% elif current_sub.status == 'expired' %}
+      <div class="alert alert-danger mb-0 rounded-0 border-0 py-2 px-4 small" role="alert">
+        <i class="fa-solid fa-circle-xmark me-1"></i>
+        Your subscription has expired. Some features are restricted.
+        <a href="{{ url_for('admin.upgrade', slug=business.slug) }}" class="alert-link ms-1">Upgrade now</a>
+      </div>
+      {% elif current_sub.status == 'active' and days is not none and days <= 5 %}
+      <div class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 py-2 px-4 small" role="alert">
+        <i class="fa-solid fa-clock me-1"></i>
+        Your <strong>{{ current_sub.features.label }}</strong> plan expires
+        {% if days == 0 %}today{% elif days == 1 %}tomorrow{% else %}in {{ days }} days{% endif %}.
+        <a href="{{ url_for('admin.upgrade', slug=business.slug) }}" class="alert-link ms-1">Renew now</a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    <div class="p-3 p-md-4">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const btn     = document.getElementById('sidebarToggleBtn');
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+
+  function openSidebar() {
+    sidebar.classList.add('sidebar-open');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('sidebar-open');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  btn.addEventListener('click', function() {
+    sidebar.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+  });
+  overlay.addEventListener('click', closeSidebar);
+
+  // Close sidebar when a nav link is tapped on mobile
+  sidebar.querySelectorAll('.nav-link').forEach(function(link) {
+    link.addEventListener('click', function() {
+      if (window.innerWidth < 992) closeSidebar();
+    });
+  });
+})();
+</script>
+{% endblock %}

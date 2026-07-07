@@ -1,0 +1,211 @@
+{% extends 'store/layout.html' %}
+{% block page_title %}Record Stock{% endblock %}
+{% block page_title_header %}Record Incoming Stock{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="alert alert-warning small">
+      <i class="fa-solid fa-lock me-2"></i>
+      Stock entries are <strong>immutable</strong>. Once recorded, they cannot be altered. Double-check before submitting.
+    </div>
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h6 class="mb-0 fw-bold"><i class="fa-solid fa-truck-ramp-box me-2"></i>New Stock Entry</h6>
+      </div>
+      <div class="card-body">
+
+        <!-- Barcode scanner field -->
+        <div class="mb-3 p-3 bg-light rounded border">
+          <label class="form-label fw-semibold small text-uppercase text-muted">
+            <i class="fa-solid fa-barcode me-1"></i>Scan Barcode to Auto-Select Product
+          </label>
+          <div class="input-group">
+            <input type="text" id="scanField" class="form-control font-monospace"
+                   placeholder="Scan or type barcode then Enter..."
+                   autocomplete="off" autofocus/>
+            <button type="button" class="btn btn-outline-secondary" id="cameraScanBtn" title="Use camera">
+              <i class="fa-solid fa-camera"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary" id="clearScan" title="Clear">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div id="scanResult" class="form-text mt-1">
+            <i class="fa-solid fa-circle-info me-1"></i>Scan a barcode to instantly select the product below.
+          </div>
+        </div>
+
+        <form method="POST" id="stockForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Product <span class="text-danger">*</span></label>
+            <select name="product_id" class="form-select" id="productSelect" required>
+              <option value="">Select product...</option>
+              {% for p in products %}
+              <option value="{{ p.id }}"
+                      data-barcode="{{ p.barcode }}"
+                      data-stock="{{ p.quantity_in_stock }}"
+                      data-unit="{{ p.unit }}"
+                      {% if request.args.get('product_id', type=int) == p.id %}selected{% endif %}>
+                {{ p.name }} — <code>{{ p.barcode }}</code> ({{ p.quantity_in_stock }} {{ p.unit }})
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text" id="currentStock"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Quantity Received <span class="text-danger">*</span></label>
+            <input type="number" name="quantity" id="quantityInput" class="form-control" min="1" required
+                   placeholder="Number of units received"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Unit Cost (per item)</label>
+            <div class="input-group">
+              <span class="input-group-text">{{ business.currency_symbol }}</span>
+              <input type="number" name="unit_cost" id="unitCost" class="form-control" step="0.01" min="0" value="0.00"/>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Total Cost</label>
+            <div class="input-group">
+              <span class="input-group-text">{{ business.currency_symbol }}</span>
+              <input type="text" id="totalCost" class="form-control" readonly value="0.00" style="background:#f8f9fa"/>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reference (Invoice / Delivery Note)</label>
+            <input type="text" name="reference" class="form-control" placeholder="e.g. INV-2024-001"/>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Notes</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Optional notes"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="fa-solid fa-floppy-disk me-1"></i>Record Stock Entry
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0">Recent Stock Entries</h6>
+      </div>
+      <div class="card-body p-0" style="max-height:600px;overflow-y:auto">
+        <table class="table table-hover table-sm align-middle mb-0 small">
+          <thead class="table-light sticky-top">
+            <tr><th>Date</th><th>Product</th><th>Barcode</th><th>Qty</th><th>Total Cost</th><th>Ref</th></tr>
+          </thead>
+          <tbody>
+            {% for e in entries %}
+            <tr>
+              <td>{{ e.created_at.strftime('%m/%d %H:%M') }}</td>
+              <td class="fw-semibold">{{ e.product.name }}</td>
+              <td><code class="small">{{ e.product.barcode }}</code></td>
+              <td class="text-success fw-bold">+{{ e.quantity }}</td>
+              <td>{% if e.total_cost and e.total_cost > 0 %}{{ business.currency_symbol }}{{ "%.2f"|format(e.total_cost) }}{% else %}—{% endif %}</td>
+              <td>{{ e.reference or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No entries yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const scanField    = document.getElementById('scanField');
+const scanResult   = document.getElementById('scanResult');
+const productSelect = document.getElementById('productSelect');
+const currentStockEl = document.getElementById('currentStock');
+const qtyInput     = document.getElementById('quantityInput');
+const unitCostInput = document.getElementById('unitCost');
+const totalCostEl  = document.getElementById('totalCost');
+
+// Build barcode → option map
+const barcodeMap = {};
+Array.from(productSelect.options).forEach(opt => {
+  if (opt.dataset.barcode) barcodeMap[opt.dataset.barcode] = opt.value;
+});
+
+// ── Barcode scanner field ─────────────────────────────────────────────────────
+let scanTimer = null;
+
+scanField.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    resolveBarcode(this.value.trim());
+  }
+});
+
+scanField.addEventListener('input', function() {
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => resolveBarcode(this.value.trim()), 80);
+});
+
+document.getElementById('clearScan').addEventListener('click', function() {
+  scanField.value = '';
+  scanField.focus();
+  scanResult.innerHTML = '<i class="fa-solid fa-circle-info me-1"></i>Ready to scan.';
+});
+
+function resolveBarcode(code) {
+  if (!code) return;
+  const prodId = barcodeMap[code];
+  if (prodId) {
+    productSelect.value = prodId;
+    updateStockInfo();
+    scanResult.innerHTML =
+      `<i class="fa-solid fa-circle-check text-success me-1"></i>` +
+      `Product selected: <strong>${productSelect.options[productSelect.selectedIndex].text.split('—')[0].trim()}</strong>`;
+    scanField.value = '';
+    qtyInput.focus();
+  } else {
+    scanResult.innerHTML =
+      `<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>` +
+      `No product found for barcode <code>${code}</code>. Check the barcode or add the product first.`;
+  }
+}
+
+// ── Product select change ─────────────────────────────────────────────────────
+productSelect.addEventListener('change', updateStockInfo);
+
+function updateStockInfo() {
+  const opt = productSelect.options[productSelect.selectedIndex];
+  if (opt && opt.dataset.stock !== undefined) {
+    currentStockEl.textContent = `Current stock: ${opt.dataset.stock} ${opt.dataset.unit}`;
+  } else {
+    currentStockEl.textContent = '';
+  }
+}
+
+// ── Total cost calculation ────────────────────────────────────────────────────
+qtyInput.addEventListener('input', calcTotal);
+unitCostInput.addEventListener('input', calcTotal);
+
+function calcTotal() {
+  const qty  = parseFloat(qtyInput.value)      || 0;
+  const cost = parseFloat(unitCostInput.value) || 0;
+  totalCostEl.value = (qty * cost).toFixed(2);
+}
+
+// Trigger on page load if product pre-selected via query string
+if (productSelect.value) updateStockInfo();
+
+// Camera scanner button
+document.getElementById('cameraScanBtn').addEventListener('click', function() {
+  openCameraScanner(function(code) {
+    scanField.value = code;
+    resolveBarcode(code);
+  });
+});
+</script>
+{% endblock %}

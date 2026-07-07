@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Verify Email — Eventry POS{% endblock %}
+{% block body %}
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="/"><i class="fa-solid fa-store me-2"></i>Eventry POS</a>
+  </div>
+</nav>
+
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+
+      <!-- Progress steps -->
+      <div class="d-flex align-items-center justify-content-center gap-2 mb-4">
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge rounded-pill bg-success px-3 py-2"><i class="fa-solid fa-check"></i></span>
+          <span class="small text-muted">Verify Email</span>
+        </div>
+        <div class="flex-grow-1 border-top border-2 mx-2" style="max-width:40px"></div>
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge rounded-pill bg-success px-3 py-2">2</span>
+          <span class="small fw-semibold">Enter Code</span>
+        </div>
+        <div class="flex-grow-1 border-top border-2 mx-2" style="max-width:40px"></div>
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge rounded-pill bg-secondary px-3 py-2">3</span>
+          <span class="small text-muted">Complete Setup</span>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4 text-center">
+          <div class="mb-3">
+            <i class="fa-solid fa-envelope-open-text fa-3x text-success"></i>
+          </div>
+          <h4 class="fw-bold mb-1">Check Your Email</h4>
+          <p class="text-muted small mb-4">
+            We sent a 6-digit code to <strong>{{ email }}</strong>.<br/>
+            It expires in 10 minutes.
+          </p>
+
+          <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="mb-3">
+              <input type="text" name="otp" class="form-control form-control-lg text-center font-monospace"
+                     maxlength="6" pattern="\d{6}" placeholder="000000"
+                     inputmode="numeric" autocomplete="one-time-code" autofocus required
+                     style="font-size:2rem;letter-spacing:10px;"/>
+            </div>
+            <button type="submit" class="btn btn-success btn-lg w-100 fw-semibold mb-3">
+              <i class="fa-solid fa-circle-check me-2"></i>Verify Code
+            </button>
+          </form>
+
+          <form method="POST" action="{{ url_for('main.resend_otp') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-link btn-sm text-muted">
+              <i class="fa-solid fa-rotate me-1"></i>Resend code
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="text-center mt-3">
+        <a href="{{ url_for('main.register_step1') }}" class="small text-muted">
+          <i class="fa-solid fa-arrow-left me-1"></i>Use a different email
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

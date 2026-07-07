@@ -1,0 +1,40 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Work Sessions{% endblock %}
+{% block page_title_header %}Work Sessions{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <div class="btn-group btn-group-sm">
+    {% for p in ['today','week','month'] %}
+    <a href="{{ url_for('admin.sessions', slug=business.slug) }}?period={{ p }}"
+       class="btn {% if period == p %}btn-dark{% else %}btn-outline-dark{% endif %}">{{ p.title() }}</a>
+    {% endfor %}
+  </div>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0 small">
+      <thead class="table-dark">
+        <tr><th>Rep</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td class="fw-semibold">{{ s.user.full_name }}</td>
+          <td>{{ s.work_date.strftime('%Y-%m-%d') }}</td>
+          <td>{{ s.clock_in.strftime('%H:%M:%S') }}</td>
+          <td>{{ s.clock_out.strftime('%H:%M:%S') if s.clock_out else '—' }}</td>
+          <td>{{ s.duration_str }}</td>
+          <td>
+            {% if s.is_active %}<span class="badge bg-success">Active</span>
+            {% else %}<span class="badge bg-secondary">Closed</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No sessions in this period.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

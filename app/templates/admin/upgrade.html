@@ -9,6 +9,13 @@
 {% endblock %}
 
 {% block content %}
+{# Resolve current plan key once #}
+{% set current_key = sub.effective_plan_key if sub else 'free' %}
+{# trial gets full access but maps to the Free card for highlighting purposes #}
+{% set free_is_current    = current_key in ('free', 'trial') %}
+{% set pro_is_current     = current_key == 'pro' %}
+{% set premium_is_current = current_key == 'premium' %}
+
 {# Current plan banner #}
 {% if sub %}
 <div class="alert alert-info d-flex align-items-center gap-2 mb-4">
@@ -43,10 +50,15 @@
 {# Plan cards #}
 <div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mb-5">
 
-  {# Free #}
+  {# ── Free ─────────────────────────────────────────────────────────────────── #}
   <div class="col col-md-4">
-    <div class="card h-100 shadow-sm">
-      <div class="card-header bg-secondary text-white text-center py-3">
+    <div class="card h-100 {% if free_is_current %}border-success border-2 shadow{% else %}shadow-sm{% endif %}">
+      <div class="card-header {% if free_is_current %}bg-success{% else %}bg-secondary{% endif %} text-white text-center py-3 position-relative">
+        {% if free_is_current %}
+        <span class="badge bg-white text-success position-absolute top-0 end-0 m-2">
+          <i class="fa-solid fa-circle-check me-1"></i>Current Plan
+        </span>
+        {% endif %}
         <h4 class="mb-0">Free</h4>
         <small class="opacity-75">Basic access</small>
       </div>
@@ -64,16 +76,31 @@
           <li class="py-1 border-bottom text-muted"><i class="fa-solid fa-xmark text-danger me-2"></i>No camera scanner</li>
           <li class="py-1 text-muted"><i class="fa-solid fa-xmark text-danger me-2"></i>No price history</li>
         </ul>
-        <div class="mt-3 text-center text-muted fst-italic small">Your fallback plan</div>
+        <div class="mt-3">
+          <button class="btn w-100 {% if free_is_current %}btn-success{% else %}btn-outline-secondary{% endif %} disabled" disabled aria-disabled="true">
+            {% if free_is_current %}
+              <i class="fa-solid fa-circle-check me-1"></i>
+              {{ 'Trial Active' if sub and sub.status == 'trialing' else 'Current Plan' }}
+            {% else %}
+              Your fallback plan
+            {% endif %}
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  {# Pro #}
+  {# ── Pro ──────────────────────────────────────────────────────────────────── #}
   <div class="col col-md-4">
-    <div class="card h-100 shadow border-primary">
-      <div class="card-header bg-primary text-white text-center py-3 position-relative">
+    <div class="card h-100 {% if pro_is_current %}border-success border-2 shadow{% else %}border-primary shadow{% endif %}">
+      <div class="card-header {% if pro_is_current %}bg-success{% else %}bg-primary{% endif %} text-white text-center py-3 position-relative">
+        {% if pro_is_current %}
+        <span class="badge bg-white text-success position-absolute top-0 end-0 m-2">
+          <i class="fa-solid fa-circle-check me-1"></i>Current Plan
+        </span>
+        {% else %}
         <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2">Popular</span>
+        {% endif %}
         <h4 class="mb-0">Pro</h4>
         <small class="opacity-75">Growing businesses</small>
       </div>
@@ -95,24 +122,38 @@
           <li class="py-1"><i class="fa-solid fa-check text-success me-2"></i>Price history</li>
         </ul>
         <div class="mt-3">
+          {% if pro_is_current %}
+          <button class="btn btn-success w-100 disabled" disabled aria-disabled="true">
+            <i class="fa-solid fa-circle-check me-1"></i>Current Plan
+          </button>
+          {% else %}
           <form method="POST" action="{{ url_for('admin.billing_initialize', slug=business.slug) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="plan" value="pro"/>
             <input type="hidden" name="billing_cycle" id="proCycleInput" value="monthly"/>
             <button type="submit" class="btn btn-primary w-100">
-              <i class="fa-solid fa-arrow-up me-1"></i>Subscribe to Pro
+              <i class="fa-solid fa-arrow-up me-1"></i>
+              {{ 'Downgrade to Pro' if premium_is_current else 'Upgrade to Pro' }}
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
 
-  {# Premium #}
+  {# ── Premium ──────────────────────────────────────────────────────────────── #}
   <div class="col col-md-4">
-    <div class="card h-100 shadow border-warning">
-      <div class="card-header text-dark text-center py-3" style="background:#ffc107">
-        <h4 class="mb-0">Premium</h4>
+    <div class="card h-100 {% if premium_is_current %}border-success border-2 shadow{% else %}border-warning shadow{% endif %}">
+      <div class="card-header text-dark text-center py-3 position-relative
+                  {% if premium_is_current %}bg-success text-white{% endif %}"
+           {% if not premium_is_current %}style="background:#ffc107"{% endif %}>
+        {% if premium_is_current %}
+        <span class="badge bg-white text-success position-absolute top-0 end-0 m-2">
+          <i class="fa-solid fa-circle-check me-1"></i>Current Plan
+        </span>
+        {% endif %}
+        <h4 class="mb-0 {% if premium_is_current %}text-white{% endif %}">Premium</h4>
         <small class="opacity-75">Power users</small>
       </div>
       <div class="card-body d-flex flex-column">
@@ -133,14 +174,20 @@
           <li class="py-1"><i class="fa-solid fa-check text-success me-2"></i>Price history</li>
         </ul>
         <div class="mt-3">
+          {% if premium_is_current %}
+          <button class="btn btn-success w-100 disabled" disabled aria-disabled="true">
+            <i class="fa-solid fa-circle-check me-1"></i>Current Plan
+          </button>
+          {% else %}
           <form method="POST" action="{{ url_for('admin.billing_initialize', slug=business.slug) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <input type="hidden" name="plan" value="premium"/>
             <input type="hidden" name="billing_cycle" id="premiumCycleInput" value="monthly"/>
             <button type="submit" class="btn btn-warning w-100 fw-bold text-dark">
-              <i class="fa-solid fa-crown me-1"></i>Subscribe to Premium
+              <i class="fa-solid fa-crown me-1"></i>Upgrade to Premium
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
     </div>

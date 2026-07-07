@@ -75,6 +75,17 @@ class Config:
     # App base URL (used in emails sent from background jobs)
     APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:5000')
 
+    # Paystack
+    PAYSTACK_PUBLIC_KEY  = os.environ.get('PAYSTACK_PUBLIC_KEY', '')
+    PAYSTACK_SECRET_KEY  = os.environ.get('PAYSTACK_SECRET_KEY', '')
+    PAYSTACK_CURRENCY    = os.environ.get('PAYSTACK_CURRENCY', 'USD')
+
+    # Plan prices in smallest currency unit (cents for USD, kobo for NGN, etc.)
+    PLAN_PRICES = {
+        'pro':     {'monthly': 1000,  'annual': 10000},   # $10/mo, $100/yr
+        'premium': {'monthly': 2000,  'annual': 18000},   # $20/mo, $180/yr
+    }
+
     # Currencies
     CURRENCIES = [
         ('NGN', '₦',    'Nigerian Naira'),

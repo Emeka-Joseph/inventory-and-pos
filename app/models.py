@@ -305,9 +305,9 @@ class Subscription(db.Model):
     period_start  = db.Column(db.DateTime, nullable=True)
     period_end    = db.Column(db.DateTime, nullable=True)
 
-    # Stripe placeholders (wired in next session)
-    stripe_customer_id     = db.Column(db.String(120), nullable=True)
-    stripe_subscription_id = db.Column(db.String(120), nullable=True)
+    # Paystack identifiers
+    paystack_customer_code = db.Column(db.String(120), nullable=True)
+    paystack_reference     = db.Column(db.String(120), nullable=True)
 
     # Trial reminder flags
     trial_r5d_sent = db.Column(db.Boolean, default=False)

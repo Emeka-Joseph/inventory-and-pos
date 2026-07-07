@@ -1,0 +1,62 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Payment Successful{% endblock %}
+{% block page_title_header %}Payment Successful{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-md-6 text-center">
+    <div class="mb-4">
+      <i class="fa-solid fa-circle-check fa-5x text-success"></i>
+    </div>
+    <h2 class="fw-bold mb-2">You're all set!</h2>
+    <p class="text-muted mb-4">
+      Your <strong>{{ plan|title }}</strong>
+      ({{ 'annual' if cycle == 'annual' else 'monthly' }}) plan is now active.
+      {% if sub and sub.period_end %}
+        It renews on <strong>{{ sub.period_end.strftime('%d %b %Y') }}</strong>.
+      {% endif %}
+    </p>
+
+    {% if sub %}
+    <div class="card border-0 shadow-sm mb-4 text-start mx-auto" style="max-width:360px">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3"><i class="fa-solid fa-list-check me-2 text-primary"></i>Plan Summary</h6>
+        <table class="table table-sm table-borderless mb-0 small">
+          <tr>
+            <td class="text-muted">Plan</td>
+            <td><span class="badge {{ sub.features.badge_class }}">{{ sub.features.label }}</span></td>
+          </tr>
+          <tr>
+            <td class="text-muted">Billing</td>
+            <td>{{ cycle|title }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">Max products</td>
+            <td>{{ sub.features.max_products or 'Unlimited' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">Max users</td>
+            <td>{{ sub.features.max_users or 'Unlimited' }}</td>
+          </tr>
+          {% if sub.period_end %}
+          <tr>
+            <td class="text-muted">Next renewal</td>
+            <td>{{ sub.period_end.strftime('%d %b %Y') }}</td>
+          </tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2 justify-content-center">
+      <a href="{{ url_for('admin.dashboard', slug=business.slug) }}" class="btn btn-primary">
+        <i class="fa-solid fa-gauge-high me-1"></i>Go to Dashboard
+      </a>
+      <a href="{{ url_for('admin.upgrade', slug=business.slug) }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-up me-1"></i>View Plans
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

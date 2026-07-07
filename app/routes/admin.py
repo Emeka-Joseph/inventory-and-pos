@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, date as date_type
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, request, flash, g, jsonify, abort
+import requests as http_requests
+from flask import Blueprint, render_template, redirect, url_for, request, flash, g, jsonify, abort, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import func, extract
 from ..extensions import db
@@ -681,3 +682,138 @@ def upgrade(slug):
     sub = biz.subscription
     return render_template('admin/upgrade.html', business=biz,
                            sub=sub, PLAN_LIMITS=PLAN_LIMITS)
+
+
+# ─── Billing (Paystack) ───────────────────────────────────────────────────────
+
+@admin_bp.route('/<slug>/admin/billing/initialize', methods=['POST'])
+@login_required
+def billing_initialize(slug):
+    """Initialize a Paystack transaction and redirect to hosted checkout."""
+    biz   = _load_biz(slug)
+    plan  = request.form.get('plan', '').strip()
+    cycle = request.form.get('billing_cycle', 'monthly').strip()
+
+    if plan not in ('pro', 'premium') or cycle not in ('monthly', 'annual'):
+        flash('Invalid plan selection.', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    prices     = current_app.config['PLAN_PRICES']
+    amount     = prices[plan][cycle]
+    currency   = current_app.config.get('PAYSTACK_CURRENCY', 'USD')
+    secret_key = current_app.config.get('PAYSTACK_SECRET_KEY', '')
+
+    if not secret_key:
+        flash('Payment is not configured yet. Please contact support.', 'warning')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    callback = url_for('admin.billing_verify', slug=slug, _external=True)
+    payload  = {
+        'email':        biz.email,
+        'amount':       amount,
+        'currency':     currency,
+        'callback_url': callback,
+        'metadata': {
+            'business_id':   biz.id,
+            'plan':          plan,
+            'billing_cycle': cycle,
+            'slug':          slug,
+        },
+    }
+
+    try:
+        resp = http_requests.post(
+            'https://api.paystack.co/transaction/initialize',
+            json=payload,
+            headers={'Authorization': f'Bearer {secret_key}'},
+            timeout=15,
+        )
+        data = resp.json()
+    except Exception as exc:
+        current_app.logger.error(f'Paystack init error: {exc}')
+        flash('Could not reach payment gateway. Please try again.', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    if not data.get('status'):
+        msg = data.get('message', 'Unknown error')
+        flash(f'Payment initialization failed: {msg}', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    return redirect(data['data']['authorization_url'])
+
+
+@admin_bp.route('/<slug>/admin/billing/verify')
+@login_required
+def billing_verify(slug):
+    """Paystack redirects here after payment with ?reference=..."""
+    biz       = _load_biz(slug)
+    reference = request.args.get('reference', '').strip()
+
+    if not reference:
+        flash('Payment reference is missing.', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    secret_key = current_app.config.get('PAYSTACK_SECRET_KEY', '')
+
+    try:
+        resp = http_requests.get(
+            f'https://api.paystack.co/transaction/verify/{reference}',
+            headers={'Authorization': f'Bearer {secret_key}'},
+            timeout=15,
+        )
+        data = resp.json()
+    except Exception as exc:
+        current_app.logger.error(f'Paystack verify error: {exc}')
+        flash('Could not verify payment. Please contact support.', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    if not data.get('status') or data['data'].get('status') != 'success':
+        flash('Payment was not successful. Please try again.', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    tx   = data['data']
+    meta = tx.get('metadata', {})
+    plan  = meta.get('plan')
+    cycle = meta.get('billing_cycle', 'monthly')
+
+    if plan not in ('pro', 'premium'):
+        flash('Unrecognised plan in payment. Please contact support.', 'danger')
+        return redirect(url_for('admin.upgrade', slug=slug))
+
+    # Activate subscription
+    sub = biz.subscription
+    if not sub:
+        sub = Subscription(business_id=biz.id)
+        db.session.add(sub)
+
+    sub.plan                  = plan
+    sub.billing_cycle         = cycle
+    sub.status                = 'active'
+    sub.period_start          = datetime.utcnow()
+    sub.period_end            = (datetime.utcnow() + timedelta(days=365)
+                                 if cycle == 'annual'
+                                 else datetime.utcnow() + timedelta(days=30))
+    sub.plan_r5d_sent         = False
+    sub.plan_r2d_sent         = False
+    sub.plan_r1d_sent         = False
+    sub.paystack_reference    = reference
+    customer = tx.get('customer', {})
+    if customer.get('customer_code'):
+        sub.paystack_customer_code = customer['customer_code']
+
+    db.session.commit()
+
+    flash(f'Payment successful! Your {plan.title()} ({cycle}) plan is now active.', 'success')
+    return redirect(url_for('admin.billing_success', slug=slug,
+                            plan=plan, cycle=cycle))
+
+
+@admin_bp.route('/<slug>/admin/billing/success')
+@login_required
+def billing_success(slug):
+    biz   = _load_biz(slug)
+    plan  = request.args.get('plan', 'pro')
+    cycle = request.args.get('cycle', 'monthly')
+    return render_template('admin/billing_success.html',
+                           business=biz, plan=plan, cycle=cycle,
+                           sub=biz.subscription)

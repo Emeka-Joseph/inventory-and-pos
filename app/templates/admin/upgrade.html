@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- Current plan status -->
+{# Current plan banner #}
 {% if sub %}
 <div class="alert alert-info d-flex align-items-center gap-2 mb-4">
   <i class="fa-solid fa-circle-info fa-lg"></i>
@@ -27,32 +27,35 @@
 </div>
 {% endif %}
 
-<!-- Billing cycle toggle -->
+{# Billing cycle toggle #}
 <div class="text-center mb-4">
-  <div class="btn-group" role="group" id="billingToggle">
-    <button type="button" class="btn btn-primary active" id="btnMonthly" onclick="setBilling('monthly')">Monthly</button>
+  <div class="btn-group" role="group">
+    <button type="button" class="btn btn-primary active" id="btnMonthly" onclick="setBilling('monthly')">
+      Monthly
+    </button>
     <button type="button" class="btn btn-outline-primary" id="btnAnnual" onclick="setBilling('annual')">
-      Annual <span class="badge bg-success ms-1">Save 17%</span>
+      Annual <span class="badge bg-success ms-1">Save ~17%</span>
     </button>
   </div>
+  <div class="text-muted small mt-2" id="cycleNote">Billed every month. Cancel anytime.</div>
 </div>
 
-<!-- Plan cards -->
-<div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center">
+{# Plan cards #}
+<div class="row row-cols-1 row-cols-md-3 g-4 justify-content-center mb-5">
 
-  <!-- Free -->
+  {# Free #}
   <div class="col col-md-4">
     <div class="card h-100 shadow-sm">
       <div class="card-header bg-secondary text-white text-center py-3">
         <h4 class="mb-0">Free</h4>
-        <small class="opacity-75">Basic use</small>
+        <small class="opacity-75">Basic access</small>
       </div>
       <div class="card-body d-flex flex-column">
         <div class="text-center mb-3">
           <span class="display-6 fw-bold">$0</span>
           <span class="text-muted">/forever</span>
         </div>
-        <ul class="list-unstyled flex-grow-1">
+        <ul class="list-unstyled flex-grow-1 small">
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i>Up to 20 products</li>
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i>Up to 2 users</li>
           <li class="py-1 border-bottom text-muted"><i class="fa-solid fa-xmark text-danger me-2"></i>No expense tracking</li>
@@ -61,14 +64,12 @@
           <li class="py-1 border-bottom text-muted"><i class="fa-solid fa-xmark text-danger me-2"></i>No camera scanner</li>
           <li class="py-1 text-muted"><i class="fa-solid fa-xmark text-danger me-2"></i>No price history</li>
         </ul>
-        <div class="mt-3 text-center">
-          <span class="text-muted fst-italic">Your fallback plan</span>
-        </div>
+        <div class="mt-3 text-center text-muted fst-italic small">Your fallback plan</div>
       </div>
     </div>
   </div>
 
-  <!-- Pro -->
+  {# Pro #}
   <div class="col col-md-4">
     <div class="card h-100 shadow border-primary">
       <div class="card-header bg-primary text-white text-center py-3 position-relative">
@@ -77,12 +78,14 @@
         <small class="opacity-75">Growing businesses</small>
       </div>
       <div class="card-body d-flex flex-column">
-        <div class="text-center mb-3">
+        <div class="text-center mb-1">
           <span class="display-6 fw-bold" id="proPrice">$10</span>
           <span class="text-muted" id="proCycle">/month</span>
-          <div class="text-success small" id="proSavings" style="display:none">Save $20/year vs monthly</div>
         </div>
-        <ul class="list-unstyled flex-grow-1">
+        <div class="text-center text-success small mb-3" id="proSavings" style="display:none">
+          Save $20 vs monthly billing
+        </div>
+        <ul class="list-unstyled flex-grow-1 small">
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i>Up to 100 products</li>
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i>Up to 10 users</li>
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i>Expense tracking</li>
@@ -92,15 +95,20 @@
           <li class="py-1"><i class="fa-solid fa-check text-success me-2"></i>Price history</li>
         </ul>
         <div class="mt-3">
-          <button class="btn btn-primary w-100" onclick="selectPlan('pro')" id="btnPro">
-            <i class="fa-solid fa-arrow-up me-1"></i>Choose Pro
-          </button>
+          <form method="POST" action="{{ url_for('admin.billing_initialize', slug=business.slug) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="plan" value="pro"/>
+            <input type="hidden" name="billing_cycle" id="proCycleInput" value="monthly"/>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="fa-solid fa-arrow-up me-1"></i>Subscribe to Pro
+            </button>
+          </form>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Premium -->
+  {# Premium #}
   <div class="col col-md-4">
     <div class="card h-100 shadow border-warning">
       <div class="card-header text-dark text-center py-3" style="background:#ffc107">
@@ -108,12 +116,14 @@
         <small class="opacity-75">Power users</small>
       </div>
       <div class="card-body d-flex flex-column">
-        <div class="text-center mb-3">
+        <div class="text-center mb-1">
           <span class="display-6 fw-bold" id="premiumPrice">$20</span>
           <span class="text-muted" id="premiumCycle">/month</span>
-          <div class="text-success small" id="premiumSavings" style="display:none">Save $60/year vs monthly</div>
         </div>
-        <ul class="list-unstyled flex-grow-1">
+        <div class="text-center text-success small mb-3" id="premiumSavings" style="display:none">
+          Save $60 vs monthly billing
+        </div>
+        <ul class="list-unstyled flex-grow-1 small">
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i><strong>Unlimited</strong> products</li>
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i><strong>Unlimited</strong> users</li>
           <li class="py-1 border-bottom"><i class="fa-solid fa-check text-success me-2"></i>Expense tracking</li>
@@ -123,9 +133,14 @@
           <li class="py-1"><i class="fa-solid fa-check text-success me-2"></i>Price history</li>
         </ul>
         <div class="mt-3">
-          <button class="btn btn-warning w-100 text-dark fw-bold" onclick="selectPlan('premium')" id="btnPremium">
-            <i class="fa-solid fa-crown me-1"></i>Choose Premium
-          </button>
+          <form method="POST" action="{{ url_for('admin.billing_initialize', slug=business.slug) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="plan" value="premium"/>
+            <input type="hidden" name="billing_cycle" id="premiumCycleInput" value="monthly"/>
+            <button type="submit" class="btn btn-warning w-100 fw-bold text-dark">
+              <i class="fa-solid fa-crown me-1"></i>Subscribe to Premium
+            </button>
+          </form>
         </div>
       </div>
     </div>
@@ -133,75 +148,46 @@
 
 </div><!-- /row -->
 
-<!-- Payment modal placeholder -->
-<div class="modal fade" id="planModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="planModalTitle">Subscribe</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body text-center py-4">
-        <i class="fa-brands fa-stripe fa-3x text-primary mb-3"></i>
-        <p class="mb-2">
-          You selected: <strong id="planModalSummary"></strong>
-        </p>
-        <p class="text-muted small">
-          Stripe payment integration is coming soon. Your selection has been noted.<br/>
-          Our team will reach out to complete your subscription manually.
-        </p>
-      </div>
-      <div class="modal-footer justify-content-center">
-        <a href="mailto:support@eventrypos.com?subject=Upgrade+Request+{{ business.name }}"
-           class="btn btn-primary">
-          <i class="fa-solid fa-envelope me-1"></i>Contact Us to Subscribe
-        </a>
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
+{# FAQ / note #}
+<div class="card border-0 bg-light mt-2">
+  <div class="card-body small text-muted text-center">
+    <i class="fa-solid fa-lock me-1 text-success"></i>
+    Payments are processed securely by
+    <strong><a href="https://paystack.com" target="_blank" class="text-decoration-none">Paystack</a></strong>.
+    You will be redirected to Paystack's secure checkout page to complete your payment.
+    After a successful payment, your plan is activated instantly.
   </div>
 </div>
 
 <script>
 var billing = 'monthly';
 
-var prices = {
-  monthly: { pro: '$10/month', premium: '$20/month' },
-  annual:  { pro: '$100/year', premium: '$180/year' }
-};
-
 function setBilling(cycle) {
   billing = cycle;
-  document.getElementById('btnMonthly').classList.toggle('active', cycle === 'monthly');
-  document.getElementById('btnMonthly').classList.toggle('btn-primary', cycle === 'monthly');
-  document.getElementById('btnMonthly').classList.toggle('btn-outline-primary', cycle !== 'monthly');
-  document.getElementById('btnAnnual').classList.toggle('active', cycle === 'annual');
-  document.getElementById('btnAnnual').classList.toggle('btn-primary', cycle === 'annual');
-  document.getElementById('btnAnnual').classList.toggle('btn-outline-primary', cycle !== 'annual');
 
-  if (cycle === 'monthly') {
-    document.getElementById('proPrice').textContent = '$10';
-    document.getElementById('proCycle').textContent = '/month';
-    document.getElementById('proSavings').style.display = 'none';
-    document.getElementById('premiumPrice').textContent = '$20';
-    document.getElementById('premiumCycle').textContent = '/month';
-    document.getElementById('premiumSavings').style.display = 'none';
-  } else {
-    document.getElementById('proPrice').textContent = '$100';
-    document.getElementById('proCycle').textContent = '/year';
-    document.getElementById('proSavings').style.display = 'block';
-    document.getElementById('premiumPrice').textContent = '$180';
-    document.getElementById('premiumCycle').textContent = '/year';
-    document.getElementById('premiumSavings').style.display = 'block';
-  }
-}
+  var isAnnual = (cycle === 'annual');
 
-function selectPlan(plan) {
-  var label = plan === 'pro' ? 'Pro' : 'Premium';
-  var price = prices[billing][plan];
-  document.getElementById('planModalTitle').textContent = 'Subscribe to ' + label;
-  document.getElementById('planModalSummary').textContent = label + ' — ' + price + ' (' + billing + ')';
-  new bootstrap.Modal(document.getElementById('planModal')).show();
+  document.getElementById('btnMonthly').className = isAnnual
+    ? 'btn btn-outline-primary' : 'btn btn-primary active';
+  document.getElementById('btnAnnual').className = isAnnual
+    ? 'btn btn-primary active' : 'btn btn-outline-primary';
+
+  document.getElementById('cycleNote').textContent = isAnnual
+    ? 'Billed once per year. Best value!' : 'Billed every month. Cancel anytime.';
+
+  // Pro
+  document.getElementById('proPrice').textContent   = isAnnual ? '$100' : '$10';
+  document.getElementById('proCycle').textContent   = isAnnual ? '/year' : '/month';
+  document.getElementById('proSavings').style.display = isAnnual ? 'block' : 'none';
+
+  // Premium
+  document.getElementById('premiumPrice').textContent   = isAnnual ? '$180' : '$20';
+  document.getElementById('premiumCycle').textContent   = isAnnual ? '/year' : '/month';
+  document.getElementById('premiumSavings').style.display = isAnnual ? 'block' : 'none';
+
+  // Update hidden form inputs
+  document.getElementById('proCycleInput').value     = cycle;
+  document.getElementById('premiumCycleInput').value = cycle;
 }
 </script>
 {% endblock %}

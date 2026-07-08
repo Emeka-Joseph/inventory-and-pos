@@ -5,9 +5,9 @@ import openpyxl
 from openpyxl.styles import Font
 from flask import (Blueprint, render_template, redirect, url_for, request, flash, g,
                     jsonify, abort, send_file)
-from flask_login import login_required, current_user
+from flask_login import login_required, login_user, current_user
 from ..extensions import db
-from ..models import Product, Category, WarehouseEntry, WarehouseMovement
+from ..models import Product, Category, User, Business, WarehouseEntry, WarehouseMovement
 from ..config import PLAN_LIMITS
 from ..utils import load_business_or_404
 
@@ -30,6 +30,49 @@ def _load_biz(slug):
         abort(403)
     g.business = biz
     return biz
+
+
+# ─── Warehouse Keeper Login ───────────────────────────────────────────────────
+# Exclusive to warehouse keepers (role='store_keeper') — no cross-links to the
+# admin or POS logins, since each role's login is a distinct, self-contained portal.
+
+@warehouse_bp.route('/<slug>/warehouse/login', methods=['GET', 'POST'])
+def warehouse_login(slug):
+    biz = Business.query.filter_by(slug=slug).first_or_404()
+
+    if biz.status == 'pending':
+        return render_template('auth/business_status.html', business=biz, status='pending')
+    if biz.status == 'suspended':
+        return render_template('auth/business_status.html', business=biz, status='suspended')
+
+    if current_user.is_authenticated and current_user.business_id == biz.id:
+        if current_user.role == 'store_keeper':
+            return redirect(url_for('warehouse.warehouse', slug=slug))
+        if current_user.role == 'admin':
+            return redirect(url_for('admin.dashboard', slug=slug))
+        return redirect(url_for('pos.pos_home', slug=slug))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        user = User.query.filter_by(
+            business_id=biz.id,
+            username=username,
+            is_active=True
+        ).first()
+
+        if user and user.check_password(password):
+            if user.role != 'store_keeper':
+                flash('This login is for Warehouse Keepers only.', 'warning')
+                return render_template('warehouse/login.html', business=biz)
+            login_user(user)
+            flash(f'Welcome back, {user.full_name}!', 'success')
+            return redirect(url_for('warehouse.warehouse', slug=slug))
+
+        flash('Invalid username or password.', 'danger')
+
+    return render_template('warehouse/login.html', business=biz)
 
 
 @warehouse_bp.route('/<slug>/warehouse/')

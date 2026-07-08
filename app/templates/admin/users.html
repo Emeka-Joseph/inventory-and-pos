@@ -31,7 +31,13 @@
           </td>
           <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
           <td>
-            {% set login_url = url_for('auth.login', slug=business.slug, _external=True) if u.role in ('admin', 'store_keeper') else url_for('pos.pos_login', slug=business.slug, _external=True) %}
+            {% if u.role == 'admin' %}
+              {% set login_url = url_for('auth.login', slug=business.slug, _external=True) %}
+            {% elif u.role == 'store_keeper' %}
+              {% set login_url = url_for('warehouse.warehouse_login', slug=business.slug, _external=True) %}
+            {% else %}
+              {% set login_url = url_for('pos.pos_login', slug=business.slug, _external=True) %}
+            {% endif %}
             <div class="d-flex align-items-center gap-1">
               <a href="{{ login_url }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Open login page">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i>

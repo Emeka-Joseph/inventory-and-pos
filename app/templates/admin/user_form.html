@@ -73,6 +73,7 @@
         <p class="small mb-1">
           <strong>Role:</strong>
           {% if user.role == 'sales_rep' %}Use POS login at <code>{{ url_for('pos.pos_login', slug=business.slug) }}</code>
+          {% elif user.role == 'store_keeper' %}Use Warehouse login at <code>{{ url_for('warehouse.warehouse_login', slug=business.slug) }}</code>
           {% else %}Use admin login at <code>{{ url_for('auth.login', slug=business.slug) }}</code>{% endif %}
         </p>
         <p class="small mb-0"><strong>Username:</strong> <code>{{ user.username }}</code></p>

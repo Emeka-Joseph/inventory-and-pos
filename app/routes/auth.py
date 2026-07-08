@@ -41,6 +41,9 @@ def login(slug):
             if user.role == 'sales_rep':
                 flash('Sales reps must use the POS login.', 'warning')
                 return redirect(url_for('pos.pos_login', slug=slug))
+            if user.role == 'store_keeper':
+                flash('Warehouse Keepers must use the Warehouse login.', 'warning')
+                return redirect(url_for('warehouse.warehouse_login', slug=slug))
             login_user(user, remember=remember)
             flash(f'Welcome back, {user.full_name}!', 'success')
             return _redirect_by_role(slug, user.role)
@@ -52,8 +55,13 @@ def login(slug):
 
 @auth_bp.route('/<slug>/logout')
 def logout(slug):
+    role = current_user.role if current_user.is_authenticated else None
     logout_user()
     flash('You have been logged out.', 'info')
+    if role == 'store_keeper':
+        return redirect(url_for('warehouse.warehouse_login', slug=slug))
+    if role == 'sales_rep':
+        return redirect(url_for('pos.pos_login', slug=slug))
     return redirect(url_for('auth.login', slug=slug))
 
 

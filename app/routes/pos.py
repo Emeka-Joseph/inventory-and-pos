@@ -41,16 +41,16 @@ def pos_login(slug):
         ).first()
 
         if user and user.check_password(password):
+            if user.role != 'sales_rep':
+                flash('This login is for Sales Reps only.', 'warning')
+                return render_template('pos/login.html', business=biz)
             login_user(user)
-            if user.role == 'sales_rep':
-                existing = WorkSession.query.filter_by(user_id=user.id, is_active=True).first()
-                if not existing:
-                    ws = WorkSession(user_id=user.id, business_id=biz.id)
-                    db.session.add(ws)
-                    db.session.commit()
-                flash(f'Welcome {user.full_name}! You are clocked in.', 'success')
-            else:
-                flash(f'Welcome back, {user.full_name}!', 'success')
+            existing = WorkSession.query.filter_by(user_id=user.id, is_active=True).first()
+            if not existing:
+                ws = WorkSession(user_id=user.id, business_id=biz.id)
+                db.session.add(ws)
+                db.session.commit()
+            flash(f'Welcome {user.full_name}! You are clocked in.', 'success')
             return redirect(url_for('pos.pos_home', slug=slug))
 
         flash('Invalid username or password.', 'danger')

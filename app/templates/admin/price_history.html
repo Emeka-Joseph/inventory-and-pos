@@ -3,32 +3,66 @@
 {% block page_title_header %}Price Change History{% endblock %}
 
 {% block content %}
-<div class="card border-0 shadow-sm">
-  <div class="card-body p-0">
-    <table class="table table-hover align-middle mb-0 small">
-      <thead class="table-dark">
-        <tr><th>Product</th><th>Old Price</th><th>New Price</th><th>Change</th><th>Changed By</th><th>Date/Time</th></tr>
-      </thead>
-      <tbody>
-        {% for h in history %}
-        <tr>
-          <td class="fw-semibold">{{ h.product.name }}</td>
-          <td>{{ business.currency_symbol }}{{ "%.2f"|format(h.old_price) }}</td>
-          <td>{{ business.currency_symbol }}{{ "%.2f"|format(h.new_price) }}</td>
-          <td>
-            {% set diff = h.new_price - h.old_price %}
-            <span class="{% if diff > 0 %}text-success{% elif diff < 0 %}text-danger{% endif %} fw-semibold">
-              {{ '+' if diff > 0 else '' }}{{ business.currency_symbol }}{{ "%.2f"|format(diff) }}
-            </span>
-          </td>
-          <td>{{ h.changer.full_name }}</td>
-          <td>{{ h.changed_at.strftime('%Y-%m-%d %H:%M') }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">No price changes recorded.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="btn-group btn-group-sm" role="group">
+      <a href="{{ url_for('admin.price_history', slug=business.slug) }}"
+         class="btn {% if not period %}btn-dark{% else %}btn-outline-dark{% endif %}">All Time</a>
+      {% for p in ['today', 'week', 'month'] %}
+      <a href="{{ url_for('admin.price_history', slug=business.slug) }}?period={{ p }}"
+         class="btn {% if period == p %}btn-dark{% else %}btn-outline-dark{% endif %}">{{ 'Day' if p == 'today' else p.title() }}</a>
+      {% endfor %}
+    </div>
   </div>
 </div>
+
+<button type="button" class="btn w-100 text-start d-flex justify-content-between align-items-center py-3 toggle-header"
+        data-bs-toggle="collapse" data-bs-target="#priceHistoryCollapse"
+        aria-expanded="false" aria-controls="priceHistoryCollapse">
+  <span><i class="fa-solid fa-tag me-2"></i>Price Changes ({{ history|length }})</span>
+  <i class="fa-solid fa-chevron-down toggle-chevron"></i>
+</button>
+
+<div class="collapse mt-2" id="priceHistoryCollapse">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-dark">
+          <tr><th>Product</th><th>Old Price</th><th>New Price</th><th>Change</th><th>Changed By</th><th>Date/Time</th></tr>
+        </thead>
+        <tbody>
+          {% for h in history %}
+          <tr>
+            <td class="fw-semibold">{{ h.product.name }}</td>
+            <td>{{ business.currency_symbol }}{{ "%.2f"|format(h.old_price) }}</td>
+            <td>{{ business.currency_symbol }}{{ "%.2f"|format(h.new_price) }}</td>
+            <td>
+              {% set diff = h.new_price - h.old_price %}
+              <span class="{% if diff > 0 %}text-success{% elif diff < 0 %}text-danger{% endif %} fw-semibold">
+                {{ '+' if diff > 0 else '' }}{{ business.currency_symbol }}{{ "%.2f"|format(diff) }}
+              </span>
+            </td>
+            <td>{{ h.changer.full_name }}</td>
+            <td>{{ h.changed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">No price changes recorded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+.toggle-header {
+  background: #212529;
+  color: #fff;
+  border-radius: .375rem;
+  font-weight: 700;
+}
+.toggle-header:hover { background: #343a40; color: #fff; }
+.toggle-chevron { transition: transform .2s; }
+.toggle-header[aria-expanded="true"] .toggle-chevron { transform: rotate(180deg); }
+</style>
 {% endblock %}

@@ -12,6 +12,9 @@ pos_bp = Blueprint('pos', __name__)
 
 def _load_biz(slug):
     biz = load_business_or_404(slug)
+    # Warehouse keepers (role='store_keeper') are scoped to the warehouse portal only.
+    if current_user.is_authenticated and current_user.role == 'store_keeper':
+        abort(403)
     g.business = biz
     return biz
 
@@ -24,7 +27,7 @@ def pos_login(slug):
 
     # Already logged in non-sales user accessing POS
     if current_user.is_authenticated and current_user.business_id == biz.id:
-        if current_user.role in ('admin', 'store_keeper'):
+        if current_user.role == 'admin':
             return redirect(url_for('pos.pos_home', slug=slug))
 
     if request.method == 'POST':

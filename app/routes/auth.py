@@ -61,5 +61,5 @@ def _redirect_by_role(slug, role):
     if role == 'admin':
         return redirect(url_for('admin.dashboard', slug=slug))
     if role == 'store_keeper':
-        return redirect(url_for('store.dashboard', slug=slug))
+        return redirect(url_for('warehouse.warehouse', slug=slug))
     return redirect(url_for('pos.pos_home', slug=slug))

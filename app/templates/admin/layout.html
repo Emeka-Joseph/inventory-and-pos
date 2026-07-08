@@ -15,17 +15,19 @@
 <div class="d-flex" id="wrapper">
   <!-- Sidebar -->
   <div class="bg-dark text-white app-sidebar d-flex flex-column flex-shrink-0 p-3" id="appSidebar">
-    <a href="{{ url_for('admin.dashboard', slug=business.slug) }}" class="text-white text-decoration-none mb-3">
+    <a href="{{ url_for('admin.dashboard', slug=business.slug) if current_user.role == 'admin' else url_for('warehouse.warehouse', slug=business.slug) }}"
+       class="text-white text-decoration-none mb-3">
       <i class="fa-solid fa-store me-2"></i><span class="fw-bold fs-6">{{ business.name }}</span>
     </a>
-    <small class="text-secondary d-block">Admin Portal</small>
-    {% if current_sub %}
+    <small class="text-secondary d-block">{{ 'Admin Portal' if current_user.role == 'admin' else 'Warehouse Portal' }}</small>
+    {% if current_sub and current_user.role == 'admin' %}
     <span class="badge mt-1 mb-2 {{ current_sub.features.badge_class }}">
       {{ current_sub.features.label }}
     </span>
     {% endif %}
     <hr class="border-secondary my-1"/>
     <ul class="nav nav-pills flex-column mb-auto mt-2 gap-1">
+      {% if current_user.role == 'admin' %}
       <li>
         <a href="{{ url_for('admin.dashboard', slug=business.slug) }}"
            class="nav-link text-white {% if request.endpoint == 'admin.dashboard' %}active bg-secondary{% endif %}">
@@ -44,6 +46,14 @@
           <i class="fa-solid fa-warehouse me-2"></i>Stock
         </a>
       </li>
+      {% endif %}
+      <li>
+        <a href="{{ url_for('warehouse.warehouse', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint and request.endpoint.startswith('warehouse.') %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-cubes me-2"></i>Warehouse Inventory
+        </a>
+      </li>
+      {% if current_user.role == 'admin' %}
       <li>
         <a href="{{ url_for('admin.sales_history', slug=business.slug) }}"
            class="nav-link text-white {% if 'sales' in request.endpoint %}active bg-secondary{% endif %}">
@@ -75,11 +85,18 @@
         </a>
       </li>
       <li>
+        <a href="{{ url_for('admin.settings', slug=business.slug) }}"
+           class="nav-link text-white {% if request.endpoint == 'admin.settings' %}active bg-secondary{% endif %}">
+          <i class="fa-solid fa-gear me-2"></i>Settings
+        </a>
+      </li>
+      <li>
         <a href="{{ url_for('admin.upgrade', slug=business.slug) }}"
            class="nav-link {% if request.endpoint == 'admin.upgrade' %}active bg-warning text-dark{% else %}text-warning{% endif %}">
           <i class="fa-solid fa-arrow-up me-2"></i>Upgrade Plan
         </a>
       </li>
+      {% endif %}
     </ul>
     <hr class="border-secondary"/>
     <div class="dropdown">
@@ -88,8 +105,10 @@
         <small>{{ current_user.full_name }}</small>
       </a>
       <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+        {% if current_user.role == 'admin' %}
         <li><a class="dropdown-item" href="{{ url_for('pos.pos_home', slug=business.slug) }}"><i class="fa-solid fa-cash-register me-2"></i>Go to POS</a></li>
         <li><hr class="dropdown-divider"/></li>
+        {% endif %}
         <li><a class="dropdown-item" href="{{ url_for('auth.logout', slug=business.slug) }}"><i class="fa-solid fa-right-from-bracket me-2"></i>Logout</a></li>
       </ul>
     </div>
@@ -102,8 +121,8 @@
       <div class="ms-auto">{% block page_actions %}{% endblock %}</div>
     </div>
 
-    {# ── Subscription banner ──────────────────────────────────────────────── #}
-    {% if current_sub %}
+    {# ── Subscription banner (admin only) ─────────────────────────────────── #}
+    {% if current_sub and current_user.role == 'admin' %}
       {% set days = current_sub.days_until_expiry %}
       {% if current_sub.status == 'trialing' and days is not none and days <= 5 %}
       <div class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 py-2 px-4 small" role="alert">

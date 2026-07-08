@@ -43,7 +43,7 @@
               <label class="form-label fw-semibold">Role <span class="text-danger">*</span></label>
               <select name="role" class="form-select" {% if user and user.id == current_user.id %}disabled{% endif %}>
                 <option value="sales_rep" {% if user and user.role == 'sales_rep' %}selected{% endif %}>Sales Rep</option>
-                <option value="store_keeper" {% if user and user.role == 'store_keeper' %}selected{% endif %}>Store Keeper</option>
+                <option value="store_keeper" {% if user and user.role == 'store_keeper' %}selected{% endif %}>Warehouse Keeper</option>
                 <option value="admin" {% if user and user.role == 'admin' %}selected{% endif %}>Admin</option>
               </select>
             </div>

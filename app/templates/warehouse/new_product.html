@@ -1,8 +1,8 @@
 {% extends 'admin/layout.html' %}
-{% block page_title %}{{ 'Edit' if product else 'New' }} Product{% endblock %}
-{% block page_title_header %}{{ 'Edit' if product else 'New' }} Product{% endblock %}
+{% block page_title %}New Warehouse Stock{% endblock %}
+{% block page_title_header %}New Warehouse Stock{% endblock %}
 {% block page_actions %}
-  <a href="{{ url_for('admin.products', slug=business.slug) }}" class="btn btn-outline-dark btn-sm">
+  <a href="{{ url_for('warehouse.warehouse', slug=business.slug) }}" class="btn btn-outline-dark btn-sm">
     <i class="fa-solid fa-arrow-left me-1"></i>Back
   </a>
 {% endblock %}
@@ -10,6 +10,12 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-7">
+    <div class="alert alert-info small">
+      <i class="fa-solid fa-circle-info me-2"></i>
+      Use this when a brand-new item is purchased that isn't in the system yet. It creates the product and
+      places its quantity into the <strong>warehouse</strong> — store stock stays at 0 until you move it
+      and update the store separately.
+    </div>
     <div class="card border-0 shadow-sm">
       <div class="card-body p-4">
         <form method="POST" id="productForm">
@@ -26,9 +32,8 @@
               <div class="input-group">
                 <input type="text" name="barcode" id="barcodeField"
                        class="form-control form-control-lg font-monospace"
-                       value="{{ product.barcode if product else '' }}"
                        placeholder="Scan barcode or type manually then press Enter"
-                       autocomplete="off" required/>
+                       autocomplete="off" required autofocus/>
                 <button type="button" class="btn btn-outline-success" id="scanToggleBtn" title="HID scanner — click and scan">
                   <i class="fa-solid fa-barcode fa-lg"></i>
                 </button>
@@ -44,22 +49,25 @@
 
             <div class="col-md-8">
               <label class="form-label fw-semibold">Product Name <span class="text-danger">*</span></label>
-              <input type="text" name="name" class="form-control" value="{{ product.name if product else '' }}" required/>
+              <input type="text" name="name" class="form-control" required/>
             </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Initial Warehouse Quantity</label>
+              <input type="number" name="initial_qty" class="form-control" min="0" value="0"/>
+            </div>
+
             <div class="col-md-4">
               <label class="form-label fw-semibold">Selling Price <span class="text-danger">*</span></label>
               <div class="input-group">
                 <span class="input-group-text">{{ business.currency_symbol }}</span>
-                <input type="number" name="unit_price" class="form-control" step="0.01" min="0"
-                       value="{{ '%.2f'|format(product.unit_price) if product else '0.00' }}" required/>
+                <input type="number" name="unit_price" class="form-control" step="0.01" min="0" value="0.00" required/>
               </div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">Cost Price</label>
               <div class="input-group">
                 <span class="input-group-text">{{ business.currency_symbol }}</span>
-                <input type="number" name="cost_price" class="form-control" step="0.01" min="0"
-                       value="{{ '%.2f'|format(product.cost_price) if product else '0.00' }}"/>
+                <input type="number" name="cost_price" class="form-control" step="0.01" min="0" value="0.00"/>
               </div>
             </div>
             <div class="col-md-4">
@@ -67,7 +75,7 @@
               <select name="category_id" class="form-select">
                 <option value="">— No Category —</option>
                 {% for cat in categories %}
-                <option value="{{ cat.id }}" {% if product and product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -75,14 +83,14 @@
               <label class="form-label fw-semibold">Unit</label>
               <select name="unit" class="form-select">
                 {% for u in ['piece','kg','g','litre','ml','box','carton','pack','dozen','pair','bag','bottle'] %}
-                <option value="{{ u }}" {% if product and product.unit == u %}selected{% endif %}>{{ u }}</option>
+                <option value="{{ u }}">{{ u }}</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">Reorder Level</label>
-              <input type="number" name="reorder_level" class="form-control" min="0"
-                     value="{{ product.reorder_level if product else 5 }}"/>
+              <input type="number" name="reorder_level" class="form-control" min="0" value="5"/>
+              <div class="form-text">Used later once this product is stocked in the store.</div>
             </div>
 
             <!-- Manufacture & Expiry dates -->
@@ -91,74 +99,31 @@
                 <i class="fa-solid fa-industry me-1 text-muted"></i>Manufacture Date
               </label>
               <input type="text" name="manufacture_date" class="form-control date-input"
-                     placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" autocomplete="off"
-                     value="{{ product.manufacture_date.strftime('%d/%m/%Y') if product and product.manufacture_date else '' }}"/>
+                     placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" autocomplete="off"/>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">
                 <i class="fa-solid fa-calendar-xmark me-1 text-danger"></i>Expiry Date
               </label>
               <input type="text" name="expiry_date" class="form-control date-input"
-                     placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" autocomplete="off"
-                     value="{{ product.expiry_date.strftime('%d/%m/%Y') if product and product.expiry_date else '' }}"/>
-              {% if product and product.expiry_date %}
-                {% if product.expiry_status == 'expired' %}
-                  <div class="form-text text-danger fw-semibold"><i class="fa-solid fa-circle-exclamation me-1"></i>This product has expired.</div>
-                {% elif product.expiry_status == 'expiring_soon' %}
-                  <div class="form-text text-warning fw-semibold"><i class="fa-solid fa-triangle-exclamation me-1"></i>Expiring within 30 days.</div>
-                {% endif %}
-              {% endif %}
+                     placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" autocomplete="off"/>
             </div>
 
             <div class="col-12">
               <label class="form-label fw-semibold">Description</label>
-              <textarea name="description" class="form-control" rows="2">{{ product.description or '' if product else '' }}</textarea>
+              <textarea name="description" class="form-control" rows="2"></textarea>
             </div>
-            {% if product %}
-            <div class="col-12">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
-                       {% if product.is_active %}checked{% endif %}/>
-                <label class="form-check-label" for="is_active">Active (visible in POS)</label>
-              </div>
-            </div>
-            {% endif %}
           </div>
           <hr/>
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-dark">
-              <i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Save Changes' if product else 'Create Product' }}
+              <i class="fa-solid fa-floppy-disk me-1"></i>Create Product In Warehouse
             </button>
-            <a href="{{ url_for('admin.products', slug=business.slug) }}" class="btn btn-outline-secondary">Cancel</a>
+            <a href="{{ url_for('warehouse.warehouse', slug=business.slug) }}" class="btn btn-outline-secondary">Cancel</a>
           </div>
         </form>
       </div>
     </div>
-
-    {% if product %}
-    <div class="card border-0 shadow-sm mt-3">
-      <div class="card-header bg-white border-0 pt-3">
-        <h6 class="fw-bold mb-0">Price Change History</h6>
-      </div>
-      <div class="card-body p-0">
-        <table class="table table-sm mb-0">
-          <thead class="table-light"><tr><th>Old Price</th><th>New Price</th><th>Changed By</th><th>Date</th></tr></thead>
-          <tbody>
-            {% for ph in product.price_history|sort(attribute='changed_at', reverse=True) %}
-            <tr>
-              <td>{{ business.currency_symbol }}{{ "%.2f"|format(ph.old_price) }}</td>
-              <td>{{ business.currency_symbol }}{{ "%.2f"|format(ph.new_price) }}</td>
-              <td>{{ ph.changer.full_name }}</td>
-              <td>{{ ph.changed_at.strftime('%Y-%m-%d %H:%M') }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" class="text-center text-muted py-2 small">No price changes recorded.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    {% endif %}
   </div>
 </div>
 {% endblock %}
@@ -168,8 +133,7 @@
 const barcodeField = document.getElementById('barcodeField');
 const barcodeStatus = document.getElementById('barcodeStatus');
 const submitBtn = document.querySelector('#productForm button[type="submit"]');
-const checkBarcodeUrl = '{{ url_for("admin.check_barcode", slug=business.slug) }}';
-const excludeId = {{ product.id if product else 'null' }};
+const checkBarcodeUrl = '{{ url_for("warehouse.check_barcode", slug=business.slug) }}';
 
 let scanTimer = null;
 let checkToken = 0;
@@ -198,13 +162,10 @@ function confirmBarcode(code) {
   submitBtn.disabled = false;
 
   const token = ++checkToken;
-  let url = `${checkBarcodeUrl}?barcode=${encodeURIComponent(code)}`;
-  if (excludeId) url += `&exclude_id=${excludeId}`;
-
-  fetch(url)
+  fetch(`${checkBarcodeUrl}?barcode=${encodeURIComponent(code)}`)
     .then(r => r.json())
     .then(data => {
-      if (token !== checkToken) return; // a newer scan superseded this check
+      if (token !== checkToken) return;
       if (data.exists) {
         barcodeField.classList.add('is-invalid');
         submitBtn.disabled = true;
@@ -243,7 +204,7 @@ document.getElementById('cameraBtn').addEventListener('click', function() {
   });
 });
 
-{% if not product %}barcodeField.focus();{% endif %}
+barcodeField.focus();
 
 document.querySelectorAll('.date-input').forEach(function(field) {
   field.addEventListener('input', function() {

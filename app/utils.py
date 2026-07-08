@@ -156,20 +156,45 @@ def send_otp_email(email, otp):
 def send_approval_email(business):
     try:
         login_url = f"{current_app.config.get('APP_BASE_URL', 'http://localhost:5000')}/{business.slug}/login"
-        msg = Message(subject='Your Eventry POS Account is Approved!',
+        msg = Message(subject=f'Welcome to Eventry POS, {business.name}! Your account is ready',
                       recipients=[business.email])
         msg.html = f"""
-        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;
                     border:1px solid #e0e0e0;border-radius:8px;">
-          <h2 style="color:#198754;">Account Approved!</h2>
-          <p>Hello,</p>
-          <p>Your <strong>Eventry POS</strong> business account for
-             <strong>{business.name}</strong> is now active with a
-             <strong>14-day free trial</strong> — no payment required.</p>
-          <p>Log in at:</p>
-          <div style="background:#f8f9fa;border-radius:6px;padding:12px;font-family:monospace;
-                      font-size:14px;color:#0d6efd;">{login_url}</div>
-          <p style="margin-top:20px">Welcome aboard!<br/>— Eventry POS Team</p>
+          <h2 style="color:#198754;margin-bottom:4px;">Congratulations, {business.name}! 🎉</h2>
+          <p style="color:#6c757d;font-size:14px;margin-top:0">Your Eventry POS account is now active</p>
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0"/>
+
+          <p style="font-size:15px;">Hello,</p>
+          <p style="font-size:15px;">
+            Taking the step to structure your business on a proper system is a bold move — and it's
+            one that pays off. You now have <strong>{business.name}</strong> running on a growth-ready,
+            easy-to-use platform built to take the guesswork out of managing inventory and sales.
+          </p>
+          <p style="font-size:15px;">
+            From today, every sale, every restock, and every product you manage feeds into
+            real, valuable information you can act on — so the decisions that matter most for your
+            business are backed by data, not guesswork.
+          </p>
+
+          <p style="font-size:15px;font-weight:700;margin-bottom:6px;">Your <strong>14-day free trial</strong> has started — no payment required.</p>
+
+          <div style="text-align:center;margin:24px 0;">
+            <a href="{login_url}" style="background:#198754;color:#fff;padding:12px 32px;
+               border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;display:inline-block;">
+              Sign In to Your Account
+            </a>
+          </div>
+          <p style="font-size:13px;color:#6c757d;text-align:center;margin-top:-12px;">
+            or copy this link: <span style="color:#0d6efd;">{login_url}</span>
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:20px 0"/>
+          <p style="font-size:13px;color:#6c757d;">
+            This sign-in page is also where every other account for your business — store staff,
+            warehouse keepers, and sales reps — will be created and managed going forward.
+          </p>
+          <p style="font-size:14px;margin-top:20px">Welcome aboard — here's to growing {business.name}!<br/>— The Eventry POS Team</p>
         </div>"""
         mail.send(msg)
     except Exception as exc:

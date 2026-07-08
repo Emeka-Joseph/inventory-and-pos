@@ -1,0 +1,63 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Business Settings{% endblock %}
+{% block page_title_header %}Business Settings{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+          <div class="mb-3">
+            <label class="form-label text-muted small">Login URL Slug</label>
+            <input type="text" class="form-control" value="{{ business.slug }}" disabled/>
+            <div class="form-text">Contact support to change this — it's used in every link and login URL for your business.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small">Registered Email</label>
+            <input type="text" class="form-control" value="{{ business.email }}" disabled/>
+          </div>
+
+          <hr/>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Business Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" value="{{ business.name }}" required/>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Currency</label>
+              <select name="currency" id="currencySelect" class="form-select">
+                {% for code, symbol, label in CURRENCIES %}
+                <option value="{{ code }}" {% if business.currency == code %}selected{% endif %}>
+                  {{ symbol }} — {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Applies to prices everywhere — POS, receipts, reports, stock.</div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Phone Number</label>
+              <input type="tel" name="phone" class="form-control" placeholder="+234..." value="{{ business.phone or '' }}"/>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Business Address</label>
+              <input type="text" name="address" class="form-control" placeholder="Optional" value="{{ business.address or '' }}"/>
+            </div>
+          </div>
+
+          <hr/>
+          <button type="submit" class="btn btn-dark">
+            <i class="fa-solid fa-floppy-disk me-1"></i>Save Changes
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

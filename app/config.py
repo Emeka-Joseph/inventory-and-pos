@@ -93,7 +93,7 @@ class Config:
         ('GBP', '£',    'British Pound'),
         ('EUR', '€',    'Euro'),
         ('GHS', 'GH₵',  'Ghanaian Cedi'),
-        ('KWD', 'د.ك', 'Kuwaiti Dinar'),
+        ('KWD', 'KD',   'Kuwaiti Dinar'),
         ('KES', 'KSh',  'Kenyan Shilling'),
         ('ZAR', 'R',    'South African Rand'),
         ('AED', 'د.إ',  'UAE Dirham'),

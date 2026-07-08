@@ -1,13 +1,17 @@
 from datetime import datetime, timedelta, date as date_type
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from io import BytesIO
 import requests as http_requests
-from flask import Blueprint, render_template, redirect, url_for, request, flash, g, jsonify, abort, current_app
+import openpyxl
+from openpyxl.styles import Font
+from flask import (Blueprint, render_template, redirect, url_for, request, flash, g,
+                    jsonify, abort, current_app, send_file)
 from flask_login import login_required, current_user
 from sqlalchemy import func, extract
 from ..extensions import db
 from ..models import (Business, User, Product, Category, StockEntry,
                       Sale, SaleItem, WorkSession, PriceHistory, Expense, Subscription)
-from ..config import PLAN_LIMITS
+from ..config import PLAN_LIMITS, Config
 from ..utils import load_business_or_404, admin_required, get_date_range, sales_summary, slugify
 
 admin_bp = Blueprint('admin', __name__)
@@ -81,6 +85,23 @@ def dashboard(slug):
 
 # ─── Products ────────────────────────────────────────────────────────────────
 
+def _apply_product_filters(query, cat_id, q, stock_filter, exp_filter):
+    if cat_id:
+        query = query.filter_by(category_id=cat_id)
+    if q:
+        query = query.filter(Product.name.ilike(f'%{q}%'))
+    if stock_filter == 'low':
+        query = query.filter(Product.quantity_in_stock <= Product.reorder_level)
+    if exp_filter == 'expired':
+        query = query.filter(Product.expiry_date.isnot(None), Product.expiry_date < date_type.today())
+    elif exp_filter == 'expiring_soon':
+        today = date_type.today()
+        query = query.filter(Product.expiry_date.isnot(None),
+                             Product.expiry_date >= today,
+                             Product.expiry_date <= today + timedelta(days=30))
+    return query
+
+
 @admin_bp.route('/<slug>/admin/products')
 @login_required
 def products(slug):
@@ -88,14 +109,81 @@ def products(slug):
     cats = Category.query.filter_by(business_id=biz.id).all()
     cat_id = request.args.get('cat', type=int)
     q = request.args.get('q', '').strip()
-    query = Product.query.filter_by(business_id=biz.id)
-    if cat_id:
-        query = query.filter_by(category_id=cat_id)
-    if q:
-        query = query.filter(Product.name.ilike(f'%{q}%'))
+    stock_filter = request.args.get('stock', '').strip()
+    exp_filter = request.args.get('exp', '').strip()
+    query = _apply_product_filters(Product.query.filter_by(business_id=biz.id),
+                                   cat_id, q, stock_filter, exp_filter)
     prods = query.order_by(Product.name).all()
+    has_filter = bool(q or cat_id or stock_filter or exp_filter)
     return render_template('admin/products.html', business=biz, products=prods,
-                           categories=cats, selected_cat=cat_id, q=q)
+                           categories=cats, selected_cat=cat_id, q=q,
+                           stock_filter=stock_filter, exp_filter=exp_filter,
+                           has_filter=has_filter)
+
+
+@admin_bp.route('/<slug>/admin/products/export')
+@login_required
+def export_products(slug):
+    """Export the current (optionally filtered) product list to an .xlsx file."""
+    biz = _load_biz(slug)
+    cat_id = request.args.get('cat', type=int)
+    q = request.args.get('q', '').strip()
+    stock_filter = request.args.get('stock', '').strip()
+    exp_filter = request.args.get('exp', '').strip()
+    query = _apply_product_filters(Product.query.filter_by(business_id=biz.id),
+                                   cat_id, q, stock_filter, exp_filter)
+    prods = query.order_by(Product.name).all()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Products'
+    headers = ['Name', 'Barcode', 'Category', 'Unit Price', 'Cost Price',
+               'Quantity In Stock', 'Unit', 'Reorder Level',
+               'Manufacture Date', 'Expiry Date', 'Description', 'Status']
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for p in prods:
+        ws.append([
+            p.name, p.barcode, p.category.name if p.category else '',
+            float(p.unit_price), float(p.cost_price), p.quantity_in_stock,
+            p.unit, p.reorder_level, p.manufacture_date, p.expiry_date,
+            p.description or '', 'Active' if p.is_active else 'Inactive',
+        ])
+        r = ws.max_row
+        ws.cell(row=r, column=9).number_format = 'DD/MM/YYYY'
+        ws.cell(row=r, column=10).number_format = 'DD/MM/YYYY'
+
+    for col_cells in ws.columns:
+        length = max((len(str(c.value)) if c.value is not None else 0) for c in col_cells)
+        ws.column_dimensions[col_cells[0].column_letter].width = max(12, length + 2)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"{biz.slug}-products-{datetime.utcnow().strftime('%Y%m%d')}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@admin_bp.route('/<slug>/admin/products/check-barcode')
+@login_required
+def check_barcode(slug):
+    """Live duplicate-barcode lookup used by the add/edit product form as you scan/type."""
+    biz = _load_biz(slug)
+    barcode = request.args.get('barcode', '').strip()
+    exclude_id = request.args.get('exclude_id', type=int)
+
+    if not barcode:
+        return jsonify(exists=False)
+
+    query = Product.query.filter_by(business_id=biz.id, barcode=barcode)
+    if exclude_id:
+        query = query.filter(Product.id != exclude_id)
+    existing = query.first()
+
+    return jsonify(exists=existing is not None, product_name=existing.name if existing else None)
 
 
 @admin_bp.route('/<slug>/admin/products/new', methods=['GET', 'POST'])
@@ -130,10 +218,10 @@ def new_product(slug):
         mfg_raw = request.form.get('manufacture_date', '').strip()
         exp_raw = request.form.get('expiry_date', '').strip()
         try:
-            mfg_date = datetime.strptime(mfg_raw, '%Y-%m-%d').date() if mfg_raw else None
-            exp_date = datetime.strptime(exp_raw, '%Y-%m-%d').date() if exp_raw else None
+            mfg_date = datetime.strptime(mfg_raw, '%d/%m/%Y').date() if mfg_raw else None
+            exp_date = datetime.strptime(exp_raw, '%d/%m/%Y').date() if exp_raw else None
         except ValueError:
-            flash('Invalid date format.', 'danger')
+            flash('Invalid date format. Please use dd/mm/yyyy.', 'danger')
             return render_template('admin/product_form.html', business=biz, categories=cats, product=None)
 
         prod = Product(
@@ -186,10 +274,10 @@ def edit_product(slug, product_id):
         mfg_raw = request.form.get('manufacture_date', '').strip()
         exp_raw = request.form.get('expiry_date', '').strip()
         try:
-            prod.manufacture_date = datetime.strptime(mfg_raw, '%Y-%m-%d').date() if mfg_raw else None
-            prod.expiry_date = datetime.strptime(exp_raw, '%Y-%m-%d').date() if exp_raw else None
+            prod.manufacture_date = datetime.strptime(mfg_raw, '%d/%m/%Y').date() if mfg_raw else None
+            prod.expiry_date = datetime.strptime(exp_raw, '%d/%m/%Y').date() if exp_raw else None
         except ValueError:
-            flash('Invalid date format.', 'danger')
+            flash('Invalid date format. Please use dd/mm/yyyy.', 'danger')
             return render_template('admin/product_form.html', business=biz, categories=cats, product=prod)
         prod.updated_at = datetime.utcnow()
 
@@ -221,6 +309,196 @@ def toggle_product(slug, product_id):
     return redirect(url_for('admin.products', slug=slug))
 
 
+BULK_UPLOAD_COLUMNS = [
+    'name', 'barcode', 'category', 'unit_price', 'cost_price',
+    'quantity_in_stock', 'unit', 'reorder_level',
+    'manufacture_date', 'expiry_date', 'description',
+]
+
+
+def _cell_text(value):
+    """Stringify an openpyxl cell value, collapsing whole-number floats (e.g. barcodes)."""
+    if value is None:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _cell_date(value):
+    if value in (None, ''):
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date_type):
+        return value
+    try:
+        return datetime.strptime(_cell_text(value), '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+@admin_bp.route('/<slug>/admin/products/bulk-upload', methods=['GET', 'POST'])
+@login_required
+def bulk_upload_products(slug):
+    biz = _load_biz(slug)
+    sub = biz.subscription
+    features = sub.features if sub else PLAN_LIMITS['free']
+    max_products = features.get('max_products')
+
+    if request.method == 'POST':
+        file = request.files.get('excel_file')
+        if not file or not file.filename:
+            flash('Please choose an Excel file to upload.', 'danger')
+            return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+        if not file.filename.lower().endswith(('.xlsx', '.xlsm')):
+            flash('Only .xlsx files are supported.', 'danger')
+            return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+
+        try:
+            wb = openpyxl.load_workbook(file.stream, data_only=True, read_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+        except Exception:
+            flash('Could not read the file. Please make sure it is a valid .xlsx file.', 'danger')
+            return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+
+        if not rows:
+            flash('The uploaded file is empty.', 'danger')
+            return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+
+        header = [_cell_text(c).lower().replace(' ', '_') for c in rows[0]]
+        if 'name' not in header or 'barcode' not in header:
+            flash('The file must contain at least "name" and "barcode" columns.', 'danger')
+            return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+        col_idx = {col: i for i, col in enumerate(header) if col}
+
+        def cell(row, key):
+            idx = col_idx.get(key)
+            if idx is None or idx >= len(row):
+                return None
+            return row[idx]
+
+        existing_count = Product.query.filter_by(business_id=biz.id, is_active=True).count()
+        existing_barcodes = {b for (b,) in db.session.query(Product.barcode).filter_by(business_id=biz.id).all()}
+        cats_by_name = {c.name.lower(): c for c in Category.query.filter_by(business_id=biz.id).all()}
+
+        created = 0
+        skipped = []
+        seen_in_file = set()
+        limit_hit = False
+
+        for i, row in enumerate(rows[1:], start=2):
+            if row is None or all(v is None or _cell_text(v) == '' for v in row):
+                continue
+
+            if limit_hit:
+                skipped.append(f'Row {i}: skipped — plan limit of {max_products} products reached.')
+                continue
+
+            name = _cell_text(cell(row, 'name'))
+            barcode = _cell_text(cell(row, 'barcode'))
+            if not name or not barcode:
+                skipped.append(f'Row {i}: missing name or barcode.')
+                continue
+            if barcode in existing_barcodes or barcode in seen_in_file:
+                skipped.append(f'Row {i}: barcode "{barcode}" already exists.')
+                continue
+            if max_products is not None and existing_count + created >= max_products:
+                skipped.append(f'Row {i}: skipped — plan limit of {max_products} products reached.')
+                limit_hit = True
+                continue
+
+            try:
+                unit_price = Decimal(_cell_text(cell(row, 'unit_price')) or '0')
+                cost_price = Decimal(_cell_text(cell(row, 'cost_price')) or '0')
+            except InvalidOperation:
+                skipped.append(f'Row {i}: invalid unit price or cost price.')
+                continue
+
+            try:
+                qty = int(float(_cell_text(cell(row, 'quantity_in_stock')) or 0))
+                reorder_level = int(float(_cell_text(cell(row, 'reorder_level')) or 5))
+            except ValueError:
+                skipped.append(f'Row {i}: invalid quantity or reorder level.')
+                continue
+
+            mfg_raw = cell(row, 'manufacture_date')
+            exp_raw = cell(row, 'expiry_date')
+            if (mfg_raw not in (None, '') and _cell_date(mfg_raw) is None) or \
+               (exp_raw not in (None, '') and _cell_date(exp_raw) is None):
+                skipped.append(f'Row {i}: invalid date format (use YYYY-MM-DD).')
+                continue
+
+            cat_name = _cell_text(cell(row, 'category'))
+            category_id = None
+            if cat_name:
+                cat = cats_by_name.get(cat_name.lower())
+                if not cat:
+                    cat = Category(business_id=biz.id, name=cat_name)
+                    db.session.add(cat)
+                    db.session.flush()
+                    cats_by_name[cat_name.lower()] = cat
+                category_id = cat.id
+
+            unit = _cell_text(cell(row, 'unit')) or 'piece'
+
+            prod = Product(
+                business_id=biz.id,
+                name=name,
+                barcode=barcode,
+                description=_cell_text(cell(row, 'description')),
+                unit_price=unit_price,
+                cost_price=cost_price,
+                quantity_in_stock=qty,
+                reorder_level=reorder_level,
+                unit=unit,
+                category_id=category_id,
+                manufacture_date=_cell_date(mfg_raw),
+                expiry_date=_cell_date(exp_raw),
+            )
+            db.session.add(prod)
+            seen_in_file.add(barcode)
+            created += 1
+
+        db.session.commit()
+
+        if created and not skipped:
+            flash(f'{created} product(s) imported successfully.', 'success')
+            return redirect(url_for('admin.products', slug=slug))
+
+        if created and skipped:
+            flash(f'{created} product(s) imported. {len(skipped)} row(s) skipped — see details below.', 'warning')
+        elif not created:
+            flash(f'No products were imported. {len(skipped)} row(s) skipped — see details below.', 'danger')
+
+        return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products,
+                               created=created, skipped=skipped)
+
+    return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+
+
+@admin_bp.route('/<slug>/admin/products/bulk-upload/template')
+@login_required
+def bulk_upload_template(slug):
+    biz = _load_biz(slug)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Products'
+    ws.append(BULK_UPLOAD_COLUMNS)
+    ws.append(['Coca-Cola 50cl', '5449000000996', 'Beverages', 500, 350,
+               100, 'bottle', 10, '2026-01-15', '2026-12-31', 'Soft drink'])
+    for col_cells in ws.columns:
+        length = max(len(_cell_text(c.value)) for c in col_cells)
+        ws.column_dimensions[col_cells[0].column_letter].width = max(12, length + 2)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='product_bulk_upload_template.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 # ─── Categories ──────────────────────────────────────────────────────────────
 
 @admin_bp.route('/<slug>/admin/categories/new', methods=['POST'])
@@ -242,18 +520,63 @@ def new_category(slug):
 @login_required
 def stock(slug):
     biz = _load_biz(slug)
-    q = request.args.get('q', '').strip()
     entries = (StockEntry.query
                .filter_by(business_id=biz.id)
                .join(Product)
-               .order_by(StockEntry.created_at.desc()))
-    if q:
-        entries = entries.filter(Product.name.ilike(f'%{q}%'))
-    entries = entries.limit(200).all()
+               .order_by(StockEntry.created_at.desc())
+               .limit(200).all())
     all_products = Product.query.filter_by(business_id=biz.id, is_active=True).order_by(Product.name).all()
     low_stock_items = [p for p in all_products if p.is_low_stock]
+    products_stock_json = [{'name': p.name, 'qty': p.quantity_in_stock} for p in all_products]
     return render_template('admin/stock.html', business=biz, entries=entries,
-                           all_products=all_products, low_stock_items=low_stock_items, q=q)
+                           all_products=all_products, low_stock_items=low_stock_items,
+                           products_stock_json=products_stock_json)
+
+
+@admin_bp.route('/<slug>/admin/stock/bulk-restock', methods=['POST'])
+@login_required
+def bulk_restock(slug):
+    """Set every active product at or below a chosen stock threshold to the same quantity."""
+    biz = _load_biz(slug)
+    threshold = request.form.get('threshold', type=int)
+    target_qty = request.form.get('target_qty', type=int)
+    reason = request.form.get('reason', '').strip()
+
+    if threshold is None or threshold < 0:
+        flash('Enter a valid stock threshold (0 or more).', 'danger')
+        return redirect(url_for('admin.stock', slug=slug))
+    if target_qty is None or target_qty <= 0:
+        flash('Enter a valid quantity greater than 0.', 'danger')
+        return redirect(url_for('admin.stock', slug=slug))
+
+    matching_products = Product.query.filter(
+        Product.business_id == biz.id,
+        Product.is_active == True,
+        Product.quantity_in_stock <= threshold
+    ).all()
+
+    if not matching_products:
+        flash(f'No products currently have stock at or below {threshold}.', 'info')
+        return redirect(url_for('admin.stock', slug=slug))
+
+    notes = f'[BULK RESTOCK] {reason}' if reason else f'[BULK RESTOCK] Items at or below {threshold} units set to {target_qty}'
+    for prod in matching_products:
+        delta = target_qty - prod.quantity_in_stock
+        prod.quantity_in_stock = target_qty
+        if delta != 0:
+            db.session.add(StockEntry(
+                business_id=biz.id,
+                product_id=prod.id,
+                user_id=current_user.id,
+                quantity=delta,
+                unit_cost=prod.cost_price,
+                total_cost=prod.cost_price * delta,
+                notes=notes,
+            ))
+
+    db.session.commit()
+    flash(f'{len(matching_products)} product(s) at or below {threshold} units updated to {target_qty}.', 'success')
+    return redirect(url_for('admin.stock', slug=slug))
 
 
 @admin_bp.route('/<slug>/admin/stock/adjust', methods=['POST'])
@@ -665,12 +988,47 @@ def price_history(slug):
     if not features.get('has_price_history'):
         flash('Price history is not available on your current plan. Upgrade to unlock it.', 'warning')
         return redirect(url_for('admin.upgrade', slug=slug))
-    history = (PriceHistory.query
-               .join(Product)
-               .filter(Product.business_id == biz.id)
-               .order_by(PriceHistory.changed_at.desc())
-               .limit(100).all())
-    return render_template('admin/price_history.html', business=biz, history=history)
+
+    period = request.args.get('period', '').strip()
+    query = PriceHistory.query.join(Product).filter(Product.business_id == biz.id)
+    if period in ('today', 'week', 'month'):
+        start, end = get_date_range(period)
+        query = query.filter(PriceHistory.changed_at >= start, PriceHistory.changed_at <= end)
+    history = query.order_by(PriceHistory.changed_at.desc()).limit(100).all()
+    return render_template('admin/price_history.html', business=biz, history=history, period=period)
+
+
+# ─── Business Settings ────────────────────────────────────────────────────────
+
+@admin_bp.route('/<slug>/admin/settings', methods=['GET', 'POST'])
+@login_required
+def settings(slug):
+    biz = _load_biz(slug)
+    valid_currencies = {code: symbol for code, symbol, _ in Config.CURRENCIES}
+
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        address = request.form.get('address', '').strip()
+        currency = request.form.get('currency', '').strip()
+
+        if not name:
+            flash('Business name is required.', 'danger')
+            return render_template('admin/settings.html', business=biz)
+        if currency not in valid_currencies:
+            flash('Please select a valid currency.', 'danger')
+            return render_template('admin/settings.html', business=biz)
+
+        biz.name = name
+        biz.phone = phone
+        biz.address = address
+        biz.currency = currency
+        biz.currency_symbol = valid_currencies[currency]
+        db.session.commit()
+        flash('Business settings updated.', 'success')
+        return redirect(url_for('admin.settings', slug=slug))
+
+    return render_template('admin/settings.html', business=biz)
 
 
 # ─── Upgrade / Pricing ───────────────────────────────────────────────────────

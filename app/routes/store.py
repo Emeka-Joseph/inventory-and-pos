@@ -1,6 +1,6 @@
 from datetime import datetime, date as date_type
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, request, flash, g, abort
+from flask import Blueprint, render_template, redirect, url_for, request, flash, g, abort, jsonify
 from flask_login import login_required, current_user
 from ..extensions import db
 from ..models import Product, Category, StockEntry, User
@@ -13,7 +13,7 @@ def _load_biz(slug):
     biz = load_business_or_404(slug)
     if not current_user.is_authenticated or current_user.business_id != biz.id:
         abort(403)
-    if current_user.role not in ('admin', 'store_keeper'):
+    if current_user.role != 'admin':
         abort(403)
     g.business = biz
     return biz
@@ -56,6 +56,18 @@ def products(slug):
                            categories=cats, selected_cat=cat_id, q=q)
 
 
+@store_bp.route('/<slug>/store/products/check-barcode')
+@login_required
+def check_barcode(slug):
+    """Live duplicate-barcode lookup used by the add product form as you scan/type."""
+    biz = _load_biz(slug)
+    barcode = request.args.get('barcode', '').strip()
+    if not barcode:
+        return jsonify(exists=False)
+    existing = Product.query.filter_by(business_id=biz.id, barcode=barcode).first()
+    return jsonify(exists=existing is not None, product_name=existing.name if existing else None)
+
+
 @store_bp.route('/<slug>/store/products/new', methods=['GET', 'POST'])
 @login_required
 def add_product(slug):
@@ -91,10 +103,10 @@ def add_product(slug):
         mfg_raw = request.form.get('manufacture_date', '').strip()
         exp_raw = request.form.get('expiry_date', '').strip()
         try:
-            mfg_date = datetime.strptime(mfg_raw, '%Y-%m-%d').date() if mfg_raw else None
-            exp_date = datetime.strptime(exp_raw, '%Y-%m-%d').date() if exp_raw else None
+            mfg_date = datetime.strptime(mfg_raw, '%d/%m/%Y').date() if mfg_raw else None
+            exp_date = datetime.strptime(exp_raw, '%d/%m/%Y').date() if exp_raw else None
         except ValueError:
-            flash('Invalid date format.', 'danger')
+            flash('Invalid date format. Please use dd/mm/yyyy.', 'danger')
             return render_template('store/add_product.html', business=biz, categories=cats)
 
         prod = Product(

@@ -6,7 +6,7 @@
 <!-- Filters -->
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-body py-2">
-    <form class="row g-2 align-items-center" method="GET">
+    <form class="row g-2 align-items-center" method="GET" id="salesFilterForm">
       <div class="col-auto">
         <div class="btn-group btn-group-sm" role="group">
           {% for p in ['today','week','month','year'] %}
@@ -16,7 +16,7 @@
         </div>
       </div>
       <div class="col-md-3">
-        <select name="user_id" class="form-select form-select-sm">
+        <select name="user_id" class="form-select form-select-sm auto-filter">
           <option value="">All Sellers</option>
           {% for s in sellers %}
           <option value="{{ s.id }}" {% if selected_user == s.id %}selected{% endif %}>{{ s.full_name }}</option>
@@ -24,7 +24,7 @@
         </select>
       </div>
       <div class="col-md-2">
-        <select name="payment" class="form-select form-select-sm">
+        <select name="payment" class="form-select form-select-sm auto-filter">
           <option value="">All Payments</option>
           {% for pm in ['cash','card','transfer','other'] %}
           <option value="{{ pm }}" {% if selected_payment == pm %}selected{% endif %}>{{ pm.title() }}</option>
@@ -97,4 +97,14 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('#salesFilterForm .auto-filter').forEach(function(sel) {
+  sel.addEventListener('change', function() {
+    this.form.submit();
+  });
+});
+</script>
 {% endblock %}

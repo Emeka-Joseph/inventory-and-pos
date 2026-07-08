@@ -47,22 +47,56 @@
         </form>
       </div>
     </div>
+
+    <!-- Bulk Restock by Threshold -->
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-header bg-warning text-dark">
+        <h6 class="mb-0 fw-bold"><i class="fa-solid fa-boxes-stacked me-2"></i>Bulk Restock by Threshold</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-2">
+          Find every product with stock <strong>at or below</strong> a level you choose, and set all of them
+          to the same new quantity in one go — handy when a batch of new items (e.g. a dozen of each) just came in.
+        </p>
+        <form method="POST" action="{{ url_for('admin.bulk_restock', slug=business.slug) }}" id="bulkRestockForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Stock At Or Below</label>
+            <input type="number" name="threshold" id="thresholdField" class="form-control form-control-sm" min="0" value="0" required/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Set Quantity To</label>
+            <input type="number" name="target_qty" id="targetQtyField" class="form-control form-control-sm" min="1" placeholder="e.g. 12" required/>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Reason (optional)</label>
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="e.g. new delivery, dozen restock"/>
+          </div>
+          <p class="small mb-3" id="restockPreview"></p>
+          <button type="submit" class="btn btn-warning btn-sm w-100 fw-semibold">
+            <i class="fa-solid fa-arrows-rotate me-1"></i>Update Matching Products
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Stock Entries -->
   <div class="col-lg-8">
     <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white border-0 d-flex align-items-center pt-3">
-        <h6 class="fw-bold mb-0">Stock Entry Log</h6>
-        <form class="ms-auto d-flex gap-2" method="GET">
-          <div class="input-group input-group-sm">
+      <button type="button" class="btn w-100 text-start d-flex justify-content-between align-items-center py-3 toggle-header"
+              data-bs-toggle="collapse" data-bs-target="#stockEntryLogCollapse"
+              aria-expanded="false" aria-controls="stockEntryLogCollapse">
+        <span><i class="fa-solid fa-clipboard-list me-2"></i>Stock Entry Log ({{ entries|length }})</span>
+        <i class="fa-solid fa-chevron-down toggle-chevron"></i>
+      </button>
+      <div class="collapse" id="stockEntryLogCollapse">
+        <div class="card-body">
+          <div class="input-group input-group-sm mb-2">
             <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-            <input type="text" name="q" class="form-control" placeholder="Search..." value="{{ q }}"/>
+            <input type="text" id="stockSearchInput" class="form-control" placeholder="Search by product..." autocomplete="off"/>
           </div>
-          <button class="btn btn-outline-dark btn-sm">Go</button>
-        </form>
-      </div>
-      <div class="card-body p-0">
+        </div>
         <div class="table-responsive" style="max-height:500px">
           <table class="table table-hover table-sm align-middle mb-0 small">
             <thead class="table-light sticky-top">
@@ -71,9 +105,9 @@
                 <th>Unit Cost</th><th>Total Cost</th><th>Ref</th><th>Recorded By</th><th>Notes</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="stockEntriesTableBody">
               {% for e in entries %}
-              <tr>
+              <tr class="searchable-row">
                 <td>{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td class="fw-semibold">{{ e.product.name }}</td>
                 <td class="{% if e.quantity < 0 %}text-danger{% else %}text-success{% endif %} fw-bold">
@@ -88,6 +122,7 @@
               {% else %}
               <tr><td colspan="8" class="text-center text-muted py-4">No stock entries yet.</td></tr>
               {% endfor %}
+              <tr id="noStockSearchResultsRow" class="d-none"><td colspan="8" class="text-center text-muted py-4">No entries match your search.</td></tr>
             </tbody>
           </table>
         </div>
@@ -95,4 +130,77 @@
     </div>
   </div>
 </div>
+
+<style>
+.toggle-header {
+  background: #212529;
+  color: #fff;
+  border-radius: .375rem;
+  font-weight: 700;
+}
+.toggle-header:hover { background: #343a40; color: #fff; }
+.toggle-chevron { transition: transform .2s; }
+.toggle-header[aria-expanded="true"] .toggle-chevron { transform: rotate(180deg); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script id="productsStockData" type="application/json">{{ products_stock_json|tojson }}</script>
+<script>
+(function() {
+  const products = JSON.parse(document.getElementById('productsStockData').textContent);
+  const thresholdField = document.getElementById('thresholdField');
+  const targetQtyField = document.getElementById('targetQtyField');
+  const preview = document.getElementById('restockPreview');
+  const form = document.getElementById('bulkRestockForm');
+
+  function matchingProducts() {
+    const threshold = parseInt(thresholdField.value, 10);
+    if (isNaN(threshold) || threshold < 0) return [];
+    return products.filter(p => p.qty <= threshold);
+  }
+
+  function updatePreview() {
+    const matches = matchingProducts();
+    if (!matches.length) {
+      preview.innerHTML = '<span class="text-muted">No products currently match this threshold.</span>';
+      return;
+    }
+    const names = matches.slice(0, 6).map(p => p.name).join(', ');
+    const extra = matches.length > 6 ? ` +${matches.length - 6} more` : '';
+    preview.innerHTML = `<strong>${matches.length}</strong> product(s) will be updated: ${names}${extra}`;
+  }
+
+  thresholdField.addEventListener('input', updatePreview);
+  updatePreview();
+
+  form.addEventListener('submit', function(e) {
+    const matches = matchingProducts();
+    const qty = targetQtyField.value;
+    if (!matches.length) {
+      e.preventDefault();
+      alert('No products match this threshold — nothing to update.');
+      return;
+    }
+    if (!confirm(`Set ${matches.length} product(s) with stock at or below ${thresholdField.value} to ${qty} units?`)) {
+      e.preventDefault();
+    }
+  });
+
+  const stockSearchInput = document.getElementById('stockSearchInput');
+  const stockRows = document.querySelectorAll('#stockEntriesTableBody tr.searchable-row');
+  const noStockResultsRow = document.getElementById('noStockSearchResultsRow');
+
+  stockSearchInput.addEventListener('input', function() {
+    const term = this.value.trim().toLowerCase();
+    let visibleCount = 0;
+    stockRows.forEach(function(row) {
+      const match = row.textContent.toLowerCase().includes(term);
+      row.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    noStockResultsRow.classList.toggle('d-none', !(term && visibleCount === 0));
+  });
+})();
+</script>
 {% endblock %}

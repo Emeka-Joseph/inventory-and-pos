@@ -14,7 +14,7 @@
       <div class="col-md-5">
         <div class="input-group input-group-sm">
           <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-          <input type="text" name="q" class="form-control" placeholder="Search products..." value="{{ q }}"/>
+          <input type="text" name="q" id="productSearchInput" class="form-control" placeholder="Search products..." value="{{ q }}" autocomplete="off"/>
         </div>
       </div>
       <div class="col-md-4">
@@ -48,9 +48,9 @@
             <th>Action</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="productsTableBody">
           {% for p in products %}
-          <tr class="{% if p.is_low_stock %}table-warning{% endif %}{% if p.expiry_status == 'expired' %} table-danger{% endif %}">
+          <tr class="searchable-row {% if p.is_low_stock %}table-warning{% endif %}{% if p.expiry_status == 'expired' %} table-danger{% endif %}">
             <td>
               <div class="fw-semibold">{{ p.name }}</div>
             </td>
@@ -87,9 +87,31 @@
           {% else %}
           <tr><td colspan="7" class="text-center text-muted py-4">No products found.</td></tr>
           {% endfor %}
+          <tr id="noSearchResultsRow" class="d-none"><td colspan="7" class="text-center text-muted py-4">No products match your search.</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const searchInput = document.getElementById('productSearchInput');
+  const rows = document.querySelectorAll('#productsTableBody tr.searchable-row');
+  const noResultsRow = document.getElementById('noSearchResultsRow');
+
+  searchInput.addEventListener('input', function() {
+    const term = this.value.trim().toLowerCase();
+    let visibleCount = 0;
+    rows.forEach(function(row) {
+      const match = row.textContent.toLowerCase().includes(term);
+      row.style.display = match ? '' : 'none';
+      if (match) visibleCount++;
+    });
+    noResultsRow.classList.toggle('d-none', !(term && visibleCount === 0));
+  });
+})();
+</script>
 {% endblock %}

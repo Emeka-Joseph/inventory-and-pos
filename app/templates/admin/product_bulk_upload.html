@@ -1,0 +1,69 @@
+{% extends 'admin/layout.html' %}
+{% block page_title %}Bulk Upload Products{% endblock %}
+{% block page_title_header %}Bulk Upload Products{% endblock %}
+{% block page_actions %}
+  <a href="{{ url_for('admin.products', slug=business.slug) }}" class="btn btn-outline-dark btn-sm">
+    <i class="fa-solid fa-arrow-left me-1"></i>Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body p-4">
+        <h6 class="fw-bold mb-2"><i class="fa-solid fa-file-excel me-1 text-success"></i>How it works</h6>
+        <ol class="small text-muted mb-3 ps-3">
+          <li>Download the Excel template below and fill in one row per product.</li>
+          <li><strong>name</strong> and <strong>barcode</strong> are required; every other column is optional.</li>
+          <li><strong>category</strong> is matched by name (case-insensitive) — new categories are created automatically.</li>
+          <li>Dates must be in <code>YYYY-MM-DD</code> format. Rows with a barcode that already exists are skipped.</li>
+          {% if max_products is not none %}
+          <li>Your current plan allows up to <strong>{{ max_products }}</strong> active products in total.</li>
+          {% endif %}
+        </ol>
+        <a href="{{ url_for('admin.bulk_upload_template', slug=business.slug) }}" class="btn btn-outline-success btn-sm">
+          <i class="fa-solid fa-download me-1"></i>Download Excel Template
+        </a>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <label class="form-label fw-semibold">Excel File <span class="text-danger">*</span></label>
+          <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xlsm" required/>
+          <div class="form-text">Only .xlsx files are supported.</div>
+          <hr/>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-dark">
+              <i class="fa-solid fa-upload me-1"></i>Upload &amp; Import
+            </button>
+            <a href="{{ url_for('admin.products', slug=business.slug) }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if skipped is defined and skipped %}
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-header bg-white border-0 pt-3">
+        <h6 class="fw-bold mb-0 text-danger">
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>Skipped Rows ({{ skipped|length }})
+        </h6>
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush small">
+          {% for reason in skipped %}
+          <li class="list-group-item">{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

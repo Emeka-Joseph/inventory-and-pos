@@ -50,6 +50,7 @@ def create_app(config_class=Config):
     from .routes.auth import auth_bp
     from .routes.admin import admin_bp
     from .routes.store import store_bp
+    from .routes.warehouse import warehouse_bp
     from .routes.pos import pos_bp
     from .routes.superadmin import superadmin_bp
     from .routes.webhooks import webhooks_bp
@@ -58,6 +59,7 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(store_bp)
+    app.register_blueprint(warehouse_bp)
     app.register_blueprint(pos_bp)
     app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
     app.register_blueprint(webhooks_bp)

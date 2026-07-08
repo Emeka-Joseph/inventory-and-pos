@@ -95,13 +95,15 @@
               <label class="form-label fw-semibold">
                 <i class="fa-solid fa-industry me-1 text-muted"></i>Manufacture Date
               </label>
-              <input type="date" name="manufacture_date" class="form-control"/>
+              <input type="text" name="manufacture_date" class="form-control date-input"
+                     placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" autocomplete="off"/>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">
                 <i class="fa-solid fa-calendar-xmark me-1 text-danger"></i>Expiry Date
               </label>
-              <input type="date" name="expiry_date" class="form-control"/>
+              <input type="text" name="expiry_date" class="form-control date-input"
+                     placeholder="dd/mm/yyyy" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" autocomplete="off"/>
             </div>
 
             <div class="col-12">
@@ -126,6 +128,9 @@ const barcodeField = document.getElementById('barcodeField');
 const barcodeStatus = document.getElementById('barcodeStatus');
 
 let scanTimer = null;
+let checkToken = 0;
+const submitBtn = document.querySelector('#productForm button[type="submit"]');
+const checkBarcodeUrl = '{{ url_for("store.check_barcode", slug=business.slug) }}';
 
 barcodeField.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
@@ -144,12 +149,37 @@ barcodeField.addEventListener('input', function() {
 });
 
 function confirmBarcode(code) {
-  barcodeField.classList.add('border-primary');
-  barcodeStatus.innerHTML =
-    '<i class="fa-solid fa-circle-check text-primary me-1"></i>' +
-    `Barcode <strong class="font-monospace">${code}</strong> captured. Fill in product details below.`;
-  const nameField = document.querySelector('input[name="name"]');
-  if (nameField && !nameField.value) nameField.focus();
+  barcodeField.classList.remove('is-invalid', 'border-primary');
+  barcodeStatus.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-muted me-1"></i>Checking barcode…';
+  submitBtn.disabled = false;
+
+  const token = ++checkToken;
+  fetch(`${checkBarcodeUrl}?barcode=${encodeURIComponent(code)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (token !== checkToken) return;
+      if (data.exists) {
+        barcodeField.classList.add('is-invalid');
+        submitBtn.disabled = true;
+        barcodeStatus.innerHTML =
+          '<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>' +
+          `Barcode <strong class="font-monospace">${code}</strong> already belongs to ` +
+          `<strong>${data.product_name}</strong>. Use Record Stock to add units instead.`;
+      } else {
+        barcodeField.classList.add('border-primary');
+        barcodeStatus.innerHTML =
+          '<i class="fa-solid fa-circle-check text-primary me-1"></i>' +
+          `Barcode <strong class="font-monospace">${code}</strong> captured. Fill in product details below.`;
+        const nameField = document.querySelector('input[name="name"]');
+        if (nameField && !nameField.value) nameField.focus();
+      }
+    })
+    .catch(() => {
+      if (token !== checkToken) return;
+      barcodeStatus.innerHTML =
+        '<i class="fa-solid fa-circle-check text-primary me-1"></i>' +
+        `Barcode <strong class="font-monospace">${code}</strong> captured. Fill in product details below.`;
+    });
 }
 
 document.getElementById('scanToggleBtn').addEventListener('click', function() {
@@ -162,6 +192,16 @@ document.getElementById('cameraBtn').addEventListener('click', function() {
   openCameraScanner(function(code) {
     barcodeField.value = code;
     confirmBarcode(code);
+  });
+});
+
+document.querySelectorAll('.date-input').forEach(function(field) {
+  field.addEventListener('input', function() {
+    let digits = this.value.replace(/\D/g, '').slice(0, 8);
+    let out = digits.slice(0, 2);
+    if (digits.length > 2) out += '/' + digits.slice(2, 4);
+    if (digits.length > 4) out += '/' + digits.slice(4, 8);
+    this.value = out;
   });
 });
 </script>

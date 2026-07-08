@@ -25,6 +25,8 @@ class Business(db.Model):
     products = db.relationship('Product', backref='business', lazy=True, cascade='all, delete-orphan')
     sales = db.relationship('Sale', backref='business', lazy=True, cascade='all, delete-orphan')
     stock_entries = db.relationship('StockEntry', backref='business', lazy=True, cascade='all, delete-orphan')
+    warehouse_entries = db.relationship('WarehouseEntry', backref='business', lazy=True, cascade='all, delete-orphan')
+    warehouse_movements = db.relationship('WarehouseMovement', backref='business', lazy=True, cascade='all, delete-orphan')
     expenses      = db.relationship('Expense', backref='business', lazy=True, cascade='all, delete-orphan')
     subscription  = db.relationship('Subscription', uselist=False, backref='business',
                                     cascade='all, delete-orphan')
@@ -53,6 +55,10 @@ class User(db.Model, UserMixin):
     sales = db.relationship('Sale', backref='seller', lazy=True, foreign_keys='Sale.user_id')
     stock_entries = db.relationship('StockEntry', backref='recorder', lazy=True, foreign_keys='StockEntry.user_id')
     work_sessions = db.relationship('WorkSession', backref='user', lazy=True, foreign_keys='WorkSession.user_id')
+    warehouse_entries = db.relationship('WarehouseEntry', backref='recorder', lazy=True,
+                                        foreign_keys='WarehouseEntry.user_id')
+    warehouse_movements = db.relationship('WarehouseMovement', backref='recorder', lazy=True,
+                                          foreign_keys='WarehouseMovement.recorded_by')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -115,6 +121,7 @@ class Product(db.Model):
     unit_price = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     cost_price = db.Column(db.Numeric(12, 2), default=0)
     quantity_in_stock = db.Column(db.Integer, default=0)
+    quantity_in_warehouse = db.Column(db.Integer, default=0)
     reorder_level = db.Column(db.Integer, default=5)
     unit = db.Column(db.String(50), default='piece')
     is_active             = db.Column(db.Boolean, default=True)
@@ -123,6 +130,8 @@ class Product(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     stock_entries = db.relationship('StockEntry', backref='product', lazy=True)
+    warehouse_entries = db.relationship('WarehouseEntry', backref='product', lazy=True)
+    warehouse_movements = db.relationship('WarehouseMovement', backref='product', lazy=True)
     sale_items = db.relationship('SaleItem', backref='product', lazy=True)
     price_history = db.relationship('PriceHistory', backref='product', lazy=True)
 
@@ -145,6 +154,10 @@ class Product(db.Model):
     def stock_value(self):
         return Decimal(str(self.cost_price or 0)) * self.quantity_in_stock
 
+    @property
+    def warehouse_stock_value(self):
+        return Decimal(str(self.cost_price or 0)) * (self.quantity_in_warehouse or 0)
+
     def __repr__(self):
         return f'<Product {self.name}>'
 
@@ -166,6 +179,43 @@ class StockEntry(db.Model):
 
     def __repr__(self):
         return f'<StockEntry product_id={self.product_id} qty={self.quantity}>'
+
+
+class WarehouseEntry(db.Model):
+    """Stock purchased/received into the warehouse — entirely separate from store/shop-floor stock."""
+    __tablename__ = 'warehouse_entries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    business_id = db.Column(db.Integer, db.ForeignKey('businesses.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_cost = db.Column(db.Numeric(12, 2), default=0)
+    total_cost = db.Column(db.Numeric(12, 2), default=0)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<WarehouseEntry product_id={self.product_id} qty={self.quantity}>'
+
+
+class WarehouseMovement(db.Model):
+    """Record of stock taken out of the warehouse — quantity, date, and who took it.
+    No destination is tracked; any resulting store restock is recorded separately via StockEntry."""
+    __tablename__ = 'warehouse_movements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    business_id = db.Column(db.Integer, db.ForeignKey('businesses.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    taken_by = db.Column(db.String(150), nullable=False)
+    movement_date = db.Column(db.Date, nullable=False, default=date.today)
+    recorded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<WarehouseMovement product_id={self.product_id} qty={self.quantity}>'
 
 
 class WorkSession(db.Model):

@@ -12,7 +12,7 @@
   <div class="card-body p-0">
     <table class="table table-hover align-middle mb-0 small">
       <thead class="table-dark">
-        <tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        <tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Login Link</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for u in users %}
@@ -22,7 +22,7 @@
           <td>{{ u.email or '—' }}</td>
           <td>
             {% if u.role == 'admin' %}<span class="badge bg-dark">Admin</span>
-            {% elif u.role == 'store_keeper' %}<span class="badge bg-primary">Store Keeper</span>
+            {% elif u.role == 'store_keeper' %}<span class="badge bg-primary">Warehouse Keeper</span>
             {% else %}<span class="badge bg-success">Sales Rep</span>{% endif %}
           </td>
           <td>
@@ -31,15 +31,49 @@
           </td>
           <td>{{ u.created_at.strftime('%Y-%m-%d') }}</td>
           <td>
+            {% set login_url = url_for('auth.login', slug=business.slug, _external=True) if u.role in ('admin', 'store_keeper') else url_for('pos.pos_login', slug=business.slug, _external=True) %}
+            <div class="d-flex align-items-center gap-1">
+              <a href="{{ login_url }}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Open login page">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </a>
+              <button type="button" class="btn btn-outline-secondary btn-sm copy-link-btn" data-link="{{ login_url }}" title="Copy login link">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </td>
+          <td>
             <a href="{{ url_for('admin.edit_user', slug=business.slug, user_id=u.id) }}"
                class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-pen"></i></a>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No users found.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">No users found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.copy-link-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const link = this.dataset.link;
+    const icon = this.querySelector('i');
+    navigator.clipboard.writeText(link).then(() => {
+      icon.classList.remove('fa-copy');
+      icon.classList.add('fa-check');
+      this.classList.remove('btn-outline-secondary');
+      this.classList.add('btn-success');
+      setTimeout(() => {
+        icon.classList.remove('fa-check');
+        icon.classList.add('fa-copy');
+        this.classList.remove('btn-success');
+        this.classList.add('btn-outline-secondary');
+      }, 1200);
+    });
+  });
+});
+</script>
 {% endblock %}

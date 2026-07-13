@@ -4,12 +4,12 @@ from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font
 from flask import (Blueprint, render_template, redirect, url_for, request, flash, g,
-                    jsonify, abort, send_file)
+                    jsonify, abort)
 from flask_login import login_required, login_user, current_user
 from ..extensions import db
 from ..models import Product, Category, User, Business, WarehouseEntry, WarehouseMovement
 from ..config import PLAN_LIMITS
-from ..utils import load_business_or_404
+from ..utils import load_business_or_404, send_excel_file
 
 warehouse_bp = Blueprint('warehouse', __name__)
 
@@ -331,5 +331,4 @@ def export_warehouse(slug):
     wb.save(buf)
     buf.seek(0)
     filename = f"{biz.slug}-warehouse-{datetime.utcnow().strftime('%Y%m%d')}.xlsx"
-    return send_file(buf, as_attachment=True, download_name=filename,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return send_excel_file(buf, filename)

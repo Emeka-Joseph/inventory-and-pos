@@ -2,10 +2,27 @@ import random
 import re
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import abort, g, redirect, url_for, flash, current_app
+from flask import abort, g, redirect, url_for, flash, current_app, request, send_file
 from flask_login import current_user
 from flask_mail import Message
 from .extensions import db, mail
+
+
+# ── In-memory file download ───────────────────────────────────────────────────
+
+def send_excel_file(buf, filename):
+    """Send an in-memory .xlsx BytesIO buffer as a download.
+
+    Some WSGI servers (notably Phusion Passenger, used by cPanel) provide their own
+    wsgi.file_wrapper that calls .fileno() to use os.sendfile() for performance. A
+    BytesIO buffer has no real file descriptor, so that raises
+    io.UnsupportedOperation: fileno and crashes the response. Removing
+    wsgi.file_wrapper makes Werkzeug fall back to its own wrapper, which reads the
+    buffer in chunks instead — safe for in-memory files.
+    """
+    request.environ.pop('wsgi.file_wrapper', None)
+    return send_file(buf, as_attachment=True, download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 # ── Slug ─────────────────────────────────────────────────────────────────────
@@ -149,6 +166,45 @@ def send_otp_email(email, otp):
     except Exception as exc:
         current_app.logger.error(f'OTP email failed to {email}: {exc}')
         return False
+
+
+# ── Registration received notification ───────────────────────────────────────
+
+def send_registration_received_email(business):
+    try:
+        msg = Message(subject=f'We\'ve received your registration, {business.name}',
+                      recipients=[business.email])
+        msg.html = f"""
+        <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;
+                    border:1px solid #e0e0e0;border-radius:8px;">
+          <h2 style="color:#212529;margin-bottom:4px;">Thanks for registering, {business.name}!</h2>
+          <p style="color:#6c757d;font-size:14px;margin-top:0">Your application is now under review</p>
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0"/>
+
+          <p style="font-size:15px;">Hello,</p>
+          <p style="font-size:15px;">
+            We've received your registration for <strong>{business.name}</strong> on Eventry POS.
+            Our team reviews every new account by hand before activating it, so you're in a short
+            queue right now — nothing more you need to do.
+          </p>
+          <div style="background:#f8f9fa;border-radius:8px;padding:16px 20px;margin:20px 0;">
+            <p style="font-size:14px;margin:0;">
+              <strong>What happens next:</strong> we typically respond within a few hours, and
+              always within <strong>48 hours</strong> at the most. Once approved, you'll get
+              another email with a link to sign in and a 14-day free trial ready to go.
+            </p>
+          </div>
+          <p style="font-size:14px;color:#6c757d;">
+            No action is needed from you in the meantime — just watch your inbox
+            (<strong>{business.email}</strong>).
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:20px 0"/>
+          <p style="font-size:14px;margin-top:20px">Thanks for choosing to grow with us.<br/>— The Eventry POS Team</p>
+        </div>"""
+        mail.send(msg)
+    except Exception as exc:
+        current_app.logger.error(f'Registration-received email failed: {exc}')
 
 
 # ── Business approval notification ───────────────────────────────────────────

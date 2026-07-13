@@ -1,18 +1,21 @@
 from datetime import datetime, timedelta, date as date_type
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+import csv
+import io
 import requests as http_requests
 import openpyxl
+import xlrd
 from openpyxl.styles import Font
 from flask import (Blueprint, render_template, redirect, url_for, request, flash, g,
-                    jsonify, abort, current_app, send_file)
+                    jsonify, abort, current_app)
 from flask_login import login_required, current_user
 from sqlalchemy import func, extract
 from ..extensions import db
 from ..models import (Business, User, Product, Category, StockEntry,
                       Sale, SaleItem, WorkSession, PriceHistory, Expense, Subscription)
 from ..config import PLAN_LIMITS, Config
-from ..utils import load_business_or_404, admin_required, get_date_range, sales_summary, slugify
+from ..utils import load_business_or_404, admin_required, get_date_range, sales_summary, slugify, send_excel_file
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -163,8 +166,7 @@ def export_products(slug):
     wb.save(buf)
     buf.seek(0)
     filename = f"{biz.slug}-products-{datetime.utcnow().strftime('%Y%m%d')}.xlsx"
-    return send_file(buf, as_attachment=True, download_name=filename,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return send_excel_file(buf, filename)
 
 
 @admin_bp.route('/<slug>/admin/products/check-barcode')
@@ -315,6 +317,19 @@ BULK_UPLOAD_COLUMNS = [
     'manufacture_date', 'expiry_date', 'description',
 ]
 
+# Maps common header variants (lowercased, spaces -> underscores) seen in real-world stock
+# lists onto the canonical column names above, so users don't have to rename their columns.
+BULK_UPLOAD_HEADER_ALIASES = {
+    'product_name': 'name', 'product': 'name', 'item_name': 'name', 'item': 'name',
+    'sku': 'barcode',
+    'selling_price': 'unit_price', 'price': 'unit_price', 'sale_price': 'unit_price',
+    'buying_price': 'cost_price', 'purchase_price': 'cost_price',
+    'qty': 'quantity_in_stock', 'quantity': 'quantity_in_stock',
+    'stock': 'quantity_in_stock', 'stock_qty': 'quantity_in_stock',
+    'reorder': 'reorder_level', 'reorder_point': 'reorder_level',
+    'mfg_date': 'manufacture_date', 'expiry': 'expiry_date', 'exp_date': 'expiry_date',
+}
+
 
 def _cell_text(value):
     """Stringify an openpyxl cell value, collapsing whole-number floats (e.g. barcodes)."""
@@ -338,6 +353,69 @@ def _cell_date(value):
         return None
 
 
+BULK_UPLOAD_EXTENSIONS = ('.xlsx', '.xlsm', '.xls', '.csv')
+
+
+def _read_bulk_upload_rows(file):
+    """Parse an uploaded bulk-upload file (.xlsx/.xlsm/.xls/.csv) into a list of row tuples.
+
+    Raises ValueError with a user-facing message if the file can't be read.
+    """
+    filename = file.filename.lower()
+
+    if filename.endswith('.csv'):
+        file.stream.seek(0)
+        raw = file.stream.read()
+        for encoding in ('utf-8-sig', 'latin-1'):
+            try:
+                text = raw.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            raise ValueError('Could not decode the CSV file. Please save it as UTF-8 CSV and try again.')
+        try:
+            return [tuple(row) for row in csv.reader(io.StringIO(text))]
+        except csv.Error as e:
+            raise ValueError(f'Could not read the CSV file ({e}).')
+
+    if filename.endswith('.xls'):
+        file.stream.seek(0)
+        try:
+            book = xlrd.open_workbook(file_contents=file.stream.read())
+            sheet = book.sheet_by_index(0)
+            return [tuple(sheet.row_values(r)) for r in range(sheet.nrows)]
+        except Exception as e:
+            raise ValueError(f'Could not read the .xls file ({e}). Please make sure it is a valid Excel 97-2003 file.')
+
+    # .xlsx / .xlsm
+    # Read the whole upload into a real in-memory buffer first. Passing file.stream
+    # straight to openpyxl breaks on some server Python builds where the underlying
+    # SpooledTemporaryFile doesn't implement .seekable() (needed pre-3.11) — zipfile
+    # (which .xlsx parsing relies on) calls that method and raises AttributeError.
+    file.stream.seek(0)
+    raw = file.stream.read()
+
+    last_err = None
+    for read_only in (True, False):
+        try:
+            wb = openpyxl.load_workbook(BytesIO(raw), data_only=True, read_only=read_only)
+            ws = wb.active
+            if ws is None:
+                last_err = 'the workbook has no readable worksheet'
+                continue
+            return list(ws.iter_rows(values_only=True))
+        except Exception as e:
+            # read_only mode is strict about worksheet metadata (e.g. a missing/incorrect
+            # <dimension> tag) that some non-Excel tools (Google Sheets, LibreOffice, WPS)
+            # omit. Fall back to normal load, which is more tolerant.
+            last_err = e
+            continue
+
+    raise ValueError(f'Could not read the file ({last_err}). The file may be corrupted — try opening it in '
+                      f'Excel or Google Sheets and saving it as a new .xlsx file.')
+
+
 @admin_bp.route('/<slug>/admin/products/bulk-upload', methods=['GET', 'POST'])
 @login_required
 def bulk_upload_products(slug):
@@ -349,27 +427,29 @@ def bulk_upload_products(slug):
     if request.method == 'POST':
         file = request.files.get('excel_file')
         if not file or not file.filename:
-            flash('Please choose an Excel file to upload.', 'danger')
+            flash('Please choose a file to upload.', 'danger')
             return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
-        if not file.filename.lower().endswith(('.xlsx', '.xlsm')):
-            flash('Only .xlsx files are supported.', 'danger')
+        if not file.filename.lower().endswith(BULK_UPLOAD_EXTENSIONS):
+            flash('Supported formats: .xlsx, .xlsm, .xls, .csv.', 'danger')
             return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
 
         try:
-            wb = openpyxl.load_workbook(file.stream, data_only=True, read_only=True)
-            ws = wb.active
-            rows = list(ws.iter_rows(values_only=True))
-        except Exception:
-            flash('Could not read the file. Please make sure it is a valid .xlsx file.', 'danger')
+            rows = _read_bulk_upload_rows(file)
+        except ValueError as e:
+            flash(str(e), 'danger')
             return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
 
         if not rows:
             flash('The uploaded file is empty.', 'danger')
             return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
 
-        header = [_cell_text(c).lower().replace(' ', '_') for c in rows[0]]
+        header_raw = [_cell_text(c).lower().replace(' ', '_') for c in rows[0]]
+        header = [BULK_UPLOAD_HEADER_ALIASES.get(h, h) for h in header_raw]
         if 'name' not in header or 'barcode' not in header:
-            flash('The file must contain at least "name" and "barcode" columns.', 'danger')
+            flash('The file must contain at least "name" (or "Product Name") and "barcode" columns.', 'danger')
+            return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
+        if 'unit_price' not in header:
+            flash('The file must contain a selling price column ("unit_price" or "Selling Price").', 'danger')
             return render_template('admin/product_bulk_upload.html', business=biz, max_products=max_products)
         col_idx = {col: i for i, col in enumerate(header) if col}
 
@@ -398,8 +478,12 @@ def bulk_upload_products(slug):
 
             name = _cell_text(cell(row, 'name'))
             barcode = _cell_text(cell(row, 'barcode'))
+            unit_price_raw = _cell_text(cell(row, 'unit_price'))
             if not name or not barcode:
                 skipped.append(f'Row {i}: missing name or barcode.')
+                continue
+            if not unit_price_raw:
+                skipped.append(f'Row {i}: missing selling price.')
                 continue
             if barcode in existing_barcodes or barcode in seen_in_file:
                 skipped.append(f'Row {i}: barcode "{barcode}" already exists.')
@@ -410,10 +494,10 @@ def bulk_upload_products(slug):
                 continue
 
             try:
-                unit_price = Decimal(_cell_text(cell(row, 'unit_price')) or '0')
+                unit_price = Decimal(unit_price_raw)
                 cost_price = Decimal(_cell_text(cell(row, 'cost_price')) or '0')
             except InvalidOperation:
-                skipped.append(f'Row {i}: invalid unit price or cost price.')
+                skipped.append(f'Row {i}: invalid selling price or cost price.')
                 continue
 
             try:
@@ -495,8 +579,7 @@ def bulk_upload_template(slug):
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name='product_bulk_upload_template.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return send_excel_file(buf, 'product_bulk_upload_template.xlsx')
 
 
 # ─── Categories ──────────────────────────────────────────────────────────────

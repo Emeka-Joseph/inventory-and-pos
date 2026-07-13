@@ -16,9 +16,10 @@
         <h6 class="fw-bold mb-2"><i class="fa-solid fa-file-excel me-1 text-success"></i>How it works</h6>
         <ol class="small text-muted mb-3 ps-3">
           <li>Download the Excel template below and fill in one row per product.</li>
-          <li><strong>name</strong> and <strong>barcode</strong> are required; every other column is optional.</li>
+          <li><strong>name</strong>, <strong>barcode</strong>, and <strong>unit_price</strong> (selling price) are required; every other column is optional.</li>
+          <li><strong>cost_price</strong> defaults to 0 if left blank.</li>
           <li><strong>category</strong> is matched by name (case-insensitive) — new categories are created automatically.</li>
-          <li>Dates must be in <code>YYYY-MM-DD</code> format. Rows with a barcode that already exists are skipped.</li>
+          <li><strong>manufacture_date</strong> and <strong>expiry_date</strong> are optional. If provided, they must be in <code>YYYY-MM-DD</code> format. Rows with a barcode that already exists are skipped.</li>
           {% if max_products is not none %}
           <li>Your current plan allows up to <strong>{{ max_products }}</strong> active products in total.</li>
           {% endif %}
@@ -33,9 +34,9 @@
       <div class="card-body p-4">
         <form method="POST" enctype="multipart/form-data">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-          <label class="form-label fw-semibold">Excel File <span class="text-danger">*</span></label>
-          <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xlsm" required/>
-          <div class="form-text">Only .xlsx files are supported.</div>
+          <label class="form-label fw-semibold">File <span class="text-danger">*</span></label>
+          <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xlsm,.xls,.csv" required/>
+          <div class="form-text">Accepted formats: .xlsx, .xlsm, .xls (Excel 97-2003), .csv (UTF-8).</div>
           <hr/>
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-dark">

@@ -3,7 +3,7 @@ from flask import (Blueprint, render_template, redirect, url_for,
                    request, flash, session)
 from ..models import Business, OtpVerification
 from ..extensions import db
-from ..utils import slugify, generate_otp, send_otp_email
+from ..utils import slugify, generate_otp, send_otp_email, send_registration_received_email
 
 main_bp = Blueprint('main', __name__)
 
@@ -170,6 +170,8 @@ def register_complete():
         admin.set_password(admin_password)
         db.session.add(admin)
         db.session.commit()
+
+        send_registration_received_email(business)
 
         # Clear registration session keys
         session.pop('reg_email', None)

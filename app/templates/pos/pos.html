@@ -437,9 +437,7 @@ async function processPayment() {
     if (data.success) {
       bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
       clearCart();
-      if (confirm(`Sale complete!\n#: ${data.sale_number}\nTotal: ${fmt(data.total)}\nChange: ${fmt(data.change)}\n\nPrint receipt?`)) {
-        window.open(data.receipt_url, '_blank');
-      }
+      window.open(data.receipt_url, '_blank');
       barcodeInput.focus();
     } else { alert('Error: ' + (data.error || 'Unknown error')); }
   } catch { alert('Network error. Please try again.'); }

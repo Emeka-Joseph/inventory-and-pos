@@ -1,4 +1,5 @@
 import os
+import traceback
 from flask import Flask, render_template
 from .config import Config
 from .extensions import db, login_manager, migrate, csrf, mail
@@ -71,6 +72,17 @@ def create_app(config_class=Config):
     @app.errorhandler(404)
     def not_found(e):
         return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        # A failed request can leave the DB session in a broken state for the
+        # next request on this same worker — always roll back.
+        db.session.rollback()
+        app.logger.error('Internal Server Error', exc_info=True)
+
+        show_details = app.config.get('SHOW_DEBUG_ERRORS', False)
+        tb = traceback.format_exc() if show_details else None
+        return render_template('errors/500.html', traceback=tb), 500
 
     # Start reorder-alert scheduler (once, even in debug mode)
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':

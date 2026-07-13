@@ -60,6 +60,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = True
 
+    # Set to 'true' in .env to show the real traceback on the 500 error page.
+    # Leave off (default) once the site is live for real users — it leaks
+    # internal paths/config. The traceback is always logged server-side either way.
+    SHOW_DEBUG_ERRORS = os.environ.get('SHOW_DEBUG_ERRORS', 'false').lower() == 'true'
+
     # Flask-Mail
     MAIL_SERVER         = 'smtp.gmail.com'
     MAIL_PORT           = 587

@@ -47,6 +47,8 @@ instance/
 
 # Uploads & user content
 app/static/uploads/
+app/static/doc/
+app/static/img/
 
 # IDE & OS
 .idea/

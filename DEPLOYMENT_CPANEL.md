@@ -160,3 +160,16 @@ Then **Restart** the app from Setup Python App. If a migration adds new columns/
 warehouse feature did locally), you'll need to apply that schema change manually via phpMyAdmin
 or a one-off script, since `db.create_all()` only creates missing tables — it won't alter
 existing ones.
+
+For example, the direct thermal-printer (QZ Tray) feature added three columns to `businesses`.
+On an already-deployed database, run this once via phpMyAdmin's SQL tab:
+
+```sql
+ALTER TABLE businesses
+  ADD COLUMN print_mode ENUM('browser','qz') NOT NULL DEFAULT 'browser',
+  ADD COLUMN printer_name VARCHAR(150) NULL,
+  ADD COLUMN paper_width_mm INT NOT NULL DEFAULT 80;
+```
+
+You'll also need `QZ_CERTIFICATE` and `QZ_PRIVATE_KEY` in the Python App's environment variables
+— see `.env.example` and `scripts/generate_qz_cert.py`.

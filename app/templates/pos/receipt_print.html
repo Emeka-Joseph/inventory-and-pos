@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Receipt {{ sale.sale_number }}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      font-size: 14px;
+      color: #000;
+      width: {{ '72mm' if business.paper_width_mm == 80 else '50mm' }};
+      margin: 0 auto;
+      padding: 2mm;
+    }
+    .center { text-align: center; }
+    .divider { border-top: 2px solid #000; margin: 8px 0; }
+    .row { display: flex; justify-content: space-between; margin: 3px 0; }
+    .bold { font-weight: 700; }
+    .big { font-size: 16px; }
+  </style>
+</head>
+<body>
+  <div id="receiptContent">
+  {% include 'pos/_receipt_body.html' %}
+  </div>
+</body>
+</html>

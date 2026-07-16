@@ -91,6 +91,12 @@ class Config:
         'premium': {'monthly': 2000,  'annual': 18000},   # $20/mo, $180/yr
     }
 
+    # QZ Tray (direct thermal-printer support) — PEM values are stored as a single .env line
+    # with literal \n sequences (since .env can't hold real newlines); we unescape them here.
+    # Generate both with scripts/generate_qz_cert.py.
+    QZ_CERTIFICATE = os.environ.get('QZ_CERTIFICATE', '').replace('\\n', '\n')
+    QZ_PRIVATE_KEY = os.environ.get('QZ_PRIVATE_KEY', '').replace('\\n', '\n')
+
     # Currencies
     CURRENCIES = [
         ('NGN', '₦',    'Nigerian Naira'),

@@ -55,6 +55,7 @@ def create_app(config_class=Config):
     from .routes.pos import pos_bp
     from .routes.superadmin import superadmin_bp
     from .routes.webhooks import webhooks_bp
+    from .routes.qz import qz_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
@@ -64,6 +65,7 @@ def create_app(config_class=Config):
     app.register_blueprint(pos_bp)
     app.register_blueprint(superadmin_bp, url_prefix='/superadmin')
     app.register_blueprint(webhooks_bp)
+    app.register_blueprint(qz_bp)
 
     @app.errorhandler(403)
     def forbidden(e):

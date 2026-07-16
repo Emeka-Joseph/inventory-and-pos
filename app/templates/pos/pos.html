@@ -205,10 +205,17 @@ body { overflow: hidden; }
 {% endblock %}
 
 {% block scripts %}
+{% if business.print_mode == 'qz' %}
+<script src="{{ url_for('static', filename='js/qz-tray.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pos-print.js') }}"></script>
+{% endif %}
 <script>
 const SYMBOL = '{{ business.currency_symbol }}';
 const SLUG   = '{{ business.slug }}';
 const CSRF   = '{{ csrf_token() }}';
+const PRINT_MODE      = '{{ business.print_mode }}';
+const PRINTER_NAME     = {{ business.printer_name|tojson }};
+const PAPER_WIDTH_MM  = {{ business.paper_width_mm }};
 let cart = {};
 
 // ── Money helpers ─────────────────────────────────────────────────────────────
@@ -408,6 +415,21 @@ function updateChange() {
   }
 }
 
+// Direct thermal print via QZ Tray when configured, always falling back to the browser
+// print tab on any failure (QZ Tray not installed/running, unreachable, misconfigured
+// printer) -- a printer problem must never block completing a sale.
+async function printReceipt(data) {
+  if (PRINT_MODE === 'qz') {
+    try {
+      await printReceiptViaQz(data.receipt_print_url, PRINTER_NAME, PAPER_WIDTH_MM);
+      return;
+    } catch (err) {
+      console.warn('Direct thermal print failed, falling back to browser print:', err);
+    }
+  }
+  window.open(data.receipt_url, '_blank');
+}
+
 async function processPayment() {
   const items = Object.values(cart);
   if (!items.length) return;
@@ -437,7 +459,7 @@ async function processPayment() {
     if (data.success) {
       bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
       clearCart();
-      window.open(data.receipt_url, '_blank');
+      await printReceipt(data);
       barcodeInput.focus();
     } else { alert('Error: ' + (data.error || 'Unknown error')); }
   } catch { alert('Network error. Please try again.'); }

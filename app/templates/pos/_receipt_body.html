@@ -1,0 +1,37 @@
+  <div class="center bold" style="font-size:16px; margin-bottom:4px">{{ business.name }}</div>
+  {% if business.address %}<div class="center" style="font-size:11px">{{ business.address }}</div>{% endif %}
+  {% if business.phone %}<div class="center" style="font-size:11px">Tel: {{ business.phone }}</div>{% endif %}
+  <div class="divider"></div>
+  <div class="center bold">SALES RECEIPT</div>
+  <div class="divider"></div>
+  <div class="row"><span>Receipt #:</span><span>{{ sale.sale_number }}</span></div>
+  <div class="row"><span>Date:</span><span>{{ sale.created_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+  <div class="row"><span>Served by:</span><span>{{ sale.seller.full_name }}</span></div>
+  {% if sale.customer_name %}<div class="row"><span>Customer:</span><span>{{ sale.customer_name }}</span></div>{% endif %}
+  <div class="divider"></div>
+  <div class="row bold"><span>Item</span><span>Qty × Price = Sub</span></div>
+  <div class="divider"></div>
+  {% for item in sale.items %}
+  <div style="margin:4px 0">
+    <div class="bold">{{ item.product_name }}</div>
+    <div class="row">
+      <span></span>
+      <span>{{ item.quantity }} × {{ business.currency_symbol }}{{ "%.2f"|format(item.unit_price) }} = {{ business.currency_symbol }}{{ "%.2f"|format(item.subtotal) }}</span>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="divider"></div>
+  <div class="row"><span>Subtotal:</span><span>{{ business.currency_symbol }}{{ "%.2f"|format(sale.subtotal) }}</span></div>
+  {% if sale.discount and sale.discount > 0 %}
+  <div class="row"><span>Discount:</span><span>-{{ business.currency_symbol }}{{ "%.2f"|format(sale.discount) }}</span></div>
+  {% endif %}
+  <div class="row bold big"><span>TOTAL:</span><span>{{ business.currency_symbol }}{{ "%.2f"|format(sale.total_amount) }}</span></div>
+  <div class="divider"></div>
+  <div class="row"><span>Payment:</span><span>{{ sale.payment_method.title() }}</span></div>
+  {% if sale.payment_method == 'cash' %}
+  <div class="row"><span>Tendered:</span><span>{{ business.currency_symbol }}{{ "%.2f"|format(sale.amount_tendered) }}</span></div>
+  <div class="row"><span>Change:</span><span>{{ business.currency_symbol }}{{ "%.2f"|format(sale.change_given) }}</span></div>
+  {% endif %}
+  <div class="divider"></div>
+  <div class="center" style="margin-top:8px">Thank you for your purchase!</div>
+  <div class="center" style="font-size:11px; margin-top:4px">Powered by Eventry POS</div>

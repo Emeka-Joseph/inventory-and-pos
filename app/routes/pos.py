@@ -247,6 +247,7 @@ def checkout(slug):
         'total': float(total),
         'change': float(change),
         'receipt_url': url_for('pos.receipt', slug=slug, sale_id=sale.id),
+        'receipt_print_url': url_for('pos.receipt_print', slug=slug, sale_id=sale.id),
     })
 
 
@@ -259,6 +260,20 @@ def receipt(slug, sale_id):
         return redirect(url_for('pos.pos_login', slug=slug))
     sale = Sale.query.filter_by(id=sale_id, business_id=biz.id).first_or_404()
     return render_template('pos/receipt.html', business=biz, sale=sale)
+
+
+@pos_bp.route('/<slug>/pos/receipt/<int:sale_id>/print')
+def receipt_print(slug, sale_id):
+    """
+    No-chrome receipt variant (no buttons, no auto window.print()) fetched by the
+    browser's own authenticated JS and handed to QZ Tray as an HTML string for
+    direct raw ESC/POS printing. Never opened directly by a user.
+    """
+    biz = _load_biz(slug)
+    if not current_user.is_authenticated or current_user.business_id != biz.id:
+        abort(403)
+    sale = Sale.query.filter_by(id=sale_id, business_id=biz.id).first_or_404()
+    return render_template('pos/receipt_print.html', business=biz, sale=sale)
 
 
 # ─── My Sessions (Sales Rep) ──────────────────────────────────────────────────

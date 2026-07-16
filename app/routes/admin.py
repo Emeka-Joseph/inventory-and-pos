@@ -1094,6 +1094,9 @@ def settings(slug):
         phone = request.form.get('phone', '').strip()
         address = request.form.get('address', '').strip()
         currency = request.form.get('currency', '').strip()
+        print_mode = request.form.get('print_mode', '').strip()
+        printer_name = request.form.get('printer_name', '').strip()
+        paper_width_mm = request.form.get('paper_width_mm', '').strip()
 
         if not name:
             flash('Business name is required.', 'danger')
@@ -1101,12 +1104,24 @@ def settings(slug):
         if currency not in valid_currencies:
             flash('Please select a valid currency.', 'danger')
             return render_template('admin/settings.html', business=biz)
+        if print_mode not in ('browser', 'qz'):
+            flash('Please select a valid print mode.', 'danger')
+            return render_template('admin/settings.html', business=biz)
+        if paper_width_mm not in ('58', '80'):
+            flash('Please select a valid paper width.', 'danger')
+            return render_template('admin/settings.html', business=biz)
+        if print_mode == 'qz' and not printer_name:
+            flash('Enter a printer name (or use "Detect Printers") before enabling direct thermal printing.', 'danger')
+            return render_template('admin/settings.html', business=biz)
 
         biz.name = name
         biz.phone = phone
         biz.address = address
         biz.currency = currency
         biz.currency_symbol = valid_currencies[currency]
+        biz.print_mode = print_mode
+        biz.printer_name = printer_name or None
+        biz.paper_width_mm = int(paper_width_mm)
         db.session.commit()
         flash('Business settings updated.', 'success')
         return redirect(url_for('admin.settings', slug=slug))

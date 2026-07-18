@@ -56,44 +56,23 @@
           <h6 class="fw-bold mb-1">Receipt Printing</h6>
           <p class="text-muted small mb-3">
             By default, receipts print through the browser — this can leave a blank gap on long
-            receipts depending on your printer driver. <strong>Direct Thermal Print</strong> sends
-            receipts straight to your printer instead, avoiding that entirely, but requires
-            installing the free <a href="https://qz.io/download/" target="_blank" rel="noopener">QZ Tray</a>
-            app once on this computer. The first time you print after installing it, QZ Tray will
-            show a one-time "trust this site?" prompt — check "remember" and you won't see it again.
+            receipts depending on your printer driver. Installing the free
+            <strong>Receipt Print Agent</strong> on this till's computer fixes that automatically:
+            once it's running, receipts print directly with no gap and no extra setup here —
+            nothing to switch on in these settings. If the agent isn't installed or isn't running,
+            printing just falls back to the normal browser print tab, so nothing breaks either way.
+            <a href="{{ url_for('main.print_agent_download') }}" target="_blank" rel="noopener">
+              Download the Receipt Print Agent <i class="fa-solid fa-arrow-up-right-from-square ms-1" style="font-size:11px"></i>
+            </a>
           </p>
 
           <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Print Mode</label>
-              <select name="print_mode" id="printModeSelect" class="form-select" onchange="toggleQzFields()">
-                <option value="browser" {% if business.print_mode == 'browser' %}selected{% endif %}>Browser Print (Default)</option>
-                <option value="qz" {% if business.print_mode == 'qz' %}selected{% endif %}>Direct Thermal Print (QZ Tray)</option>
-              </select>
-            </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Paper Width</label>
               <select name="paper_width_mm" class="form-select">
                 <option value="80" {% if business.paper_width_mm == 80 %}selected{% endif %}>80mm</option>
                 <option value="58" {% if business.paper_width_mm == 58 %}selected{% endif %}>58mm</option>
               </select>
-            </div>
-          </div>
-
-          <div class="row g-3 mb-3" id="qzPrinterFields" style="display:none">
-            <div class="col-12">
-              <label class="form-label fw-semibold">Printer Name</label>
-              <div class="input-group">
-                <input type="text" name="printer_name" id="printerNameInput" class="form-control"
-                       placeholder="Exact printer name as installed on this computer"
-                       value="{{ business.printer_name or '' }}"/>
-                <button type="button" class="btn btn-outline-secondary" onclick="runDetectPrinters()">
-                  <i class="fa-solid fa-magnifying-glass me-1"></i>Detect Printers
-                </button>
-              </div>
-              <div class="form-text" id="qzDetectStatus">
-                QZ Tray must be installed and running on this computer to detect printers.
-              </div>
             </div>
           </div>
 
@@ -106,33 +85,4 @@
     </div>
   </div>
 </div>
-
-<script src="{{ url_for('static', filename='js/qz-tray.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pos-print.js') }}"></script>
-<script>
-function toggleQzFields() {
-  const isQz = document.getElementById('printModeSelect').value === 'qz';
-  document.getElementById('qzPrinterFields').style.display = isQz ? '' : 'none';
-}
-toggleQzFields();
-
-async function runDetectPrinters() {
-  const status = document.getElementById('qzDetectStatus');
-  status.textContent = 'Looking for QZ Tray...';
-  try {
-    const printers = await detectPrinters();
-    if (!printers.length) {
-      status.textContent = 'QZ Tray is running but found no printers installed on this computer.';
-      return;
-    }
-    const input = document.getElementById('printerNameInput');
-    input.value = printers[0];
-    status.innerHTML = 'Found: ' + printers.map(p => `<code>${p}</code>`).join(', ') +
-      ' — first one filled in above, change it if that\'s not the right one.';
-  } catch (err) {
-    status.textContent = 'Could not reach QZ Tray. Make sure it is installed and running, then try again.';
-    console.warn('QZ printer detection failed:', err);
-  }
-}
-</script>
 {% endblock %}

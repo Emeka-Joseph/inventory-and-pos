@@ -20,10 +20,8 @@ class Business(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Receipt printing: 'browser' = today's window.print() flow (default, unchanged behavior);
-    # 'qz' = direct raw ESC/POS printing via QZ Tray, bypassing the OS print pipeline entirely.
-    print_mode = db.Column(db.Enum('browser', 'qz'), nullable=False, default='browser')
-    printer_name = db.Column(db.String(150))
+    # Physical receipt roll width. Used to size the bitmap the print-agent rasterizes
+    # (see app/static/js/print-client.js) and the browser-print fallback's page width.
     paper_width_mm = db.Column(db.Integer, nullable=False, default=80)
 
     users = db.relationship('User', backref='business', lazy=True, cascade='all, delete-orphan')

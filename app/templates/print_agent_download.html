@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Receipt Print Agent — Eventry POS{% endblock %}
+{% block body %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand fw-bold fs-4" href="/"><i class="fa-solid fa-store me-2"></i>Eventry POS</a>
+  </div>
+</nav>
+
+<section class="py-5">
+  <div class="container" style="max-width: 640px">
+    <div class="text-center mb-4">
+      <i class="fa-solid fa-receipt fa-3x text-success mb-3"></i>
+      <h1 class="fw-bold">Receipt Print Agent</h1>
+      <p class="text-muted">
+        Install this once on each till's computer to print receipts directly to your
+        thermal printer — no blank gaps, no page-size settings, ever again.
+      </p>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4 text-center">
+        <a href="{{ url_for('static', filename='downloads/ReceiptPrintAgentSetup.exe') }}"
+           class="btn btn-success btn-lg px-5" download>
+          <i class="fa-solid fa-download me-2"></i>Download for Windows
+        </a>
+        <div class="form-text mt-2">Windows 10/11, 64-bit. Free, installs in a few seconds.</div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <h6 class="fw-bold mb-3">What happens when you install it</h6>
+        <ol class="mb-0">
+          <li class="mb-2">Run the downloaded file and click <strong>Yes</strong> when Windows asks for permission.</li>
+          <li class="mb-2">It starts automatically and opens a page to pick your printer from a dropdown.</li>
+          <li class="mb-2">Choose your printer, save — that's it. It also starts quietly every time this computer turns on, so you never have to think about it again.</li>
+        </ol>
+      </div>
+    </div>
+
+    <p class="text-muted small text-center mt-4">
+      Don't have a thermal printer set up yet, or skipping this for now? No problem —
+      receipts will still print fine through your browser as they do today.
+    </p>
+  </div>
+</section>
+{% endblock %}

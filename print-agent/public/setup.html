@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Receipt Printer Setup</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 480px; margin: 48px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 20px; }
+  p { color: #555; line-height: 1.5; }
+  select, button { font-size: 16px; padding: 10px; margin-top: 10px; width: 100%; box-sizing: border-box; }
+  button { background: #198754; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #157347; }
+  #msg { margin-top: 14px; font-weight: 600; }
+  .ok { color: #198754; }
+  .err { color: #c0392b; }
+  .status { font-size: 13px; color: #888; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <h1>Receipt Printer Setup</h1>
+  <p>Choose the printer this till should use for receipts. You only need to do this once — after saving, the POS app will print here automatically every time.</p>
+
+  <select id="printerSelect"></select>
+  <button id="saveBtn">Save as default printer</button>
+  <p id="msg"></p>
+
+  <p class="status" id="statusLine"></p>
+
+<script>
+async function load() {
+  const res = await fetch('/status');
+  const data = await res.json();
+  const select = document.getElementById('printerSelect');
+  select.innerHTML = '';
+
+  if (!data.printers || data.printers.length === 0) {
+    document.getElementById('msg').textContent =
+      'No printers found. Make sure the printer is plugged in and shows up in your Windows/Mac printer list first, then reload this page.';
+    document.getElementById('msg').className = 'err';
+    return;
+  }
+
+  data.printers.forEach((name) => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    if (name === data.defaultPrinter) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  document.getElementById('statusLine').textContent =
+    `Agent v${data.version} running • currently set to: ${data.defaultPrinter || 'none yet'}`;
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const printerName = document.getElementById('printerSelect').value;
+  const res = await fetch('/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ defaultPrinter: printerName }),
+  });
+  const data = await res.json();
+  const msg = document.getElementById('msg');
+  if (data.ok) {
+    msg.textContent = 'Saved. This till will now print receipts to ' + printerName + '.';
+    msg.className = 'ok';
+  } else {
+    msg.textContent = 'Could not save the setting.';
+    msg.className = 'err';
+  }
+});
+
+load();
+</script>
+</body>
+</html>

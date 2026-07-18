@@ -13,6 +13,14 @@ def landing():
     return render_template('landing.html')
 
 
+@main_bp.route('/print-agent')
+def print_agent_download():
+    # Public/unauthenticated on purpose: a shop owner should be able to send
+    # this link to whoever is physically setting up a till, even if that
+    # person doesn't have (or shouldn't have) admin login credentials.
+    return render_template('print_agent_download.html')
+
+
 # ─── Step 1: Enter email → send OTP ─────────────────────────────────────────
 
 @main_bp.route('/register', methods=['GET', 'POST'])

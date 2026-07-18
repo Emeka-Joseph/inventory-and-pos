@@ -17,6 +17,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+installer_output/
 eggs/
 .eggs/
 *.egg-link
@@ -49,6 +50,7 @@ instance/
 app/static/uploads/
 app/static/doc/
 app/static/img/
+app/static/downloads/
 
 # IDE & OS
 .idea/

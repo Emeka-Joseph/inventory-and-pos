@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8"/>
   <title>Receipt {{ sale.sale_number }}</title>
+
+  <!-- Needed only for print-agent-based printing (rasterizes #receiptContent client-side). -->
+  <script src="{{ url_for('static', filename='js/html2canvas.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/print-client.js') }}"></script>
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -32,24 +37,40 @@
   </div>
 
   <div class="no-print" style="margin-top:1rem; text-align:center">
-    <button onclick="window.print()" style="padding:8px 20px;background:#198754;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">
+    <button onclick="printNow()" style="padding:8px 20px;background:#198754;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">
       Print Receipt
     </button>
     <button onclick="window.close()" style="padding:8px 20px;margin-left:8px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">
       Close
     </button>
   </div>
+
   <script>
-    window.onload = function() {
-      // Size the printed page to exactly fit the receipt content (no @page "auto" — that lets the
-      // printer driver's default fixed page length take over, which is what causes a blank gap
-      // followed by the tail of the receipt on a "second page" of the same continuous roll).
-      const heightMm = Math.ceil(document.getElementById('receiptContent').scrollHeight * 25.4 / 96) + 4;
-      const style = document.createElement('style');
-      style.textContent = `@page { size: {{ '72mm' if business.paper_width_mm == 80 else '50mm' }} ${heightMm}mm; margin: 0; }`;
-      document.head.appendChild(style);
-      window.print();
-    };
+    function printNow() {
+      // Primary path: hand the receipt to the local print agent (see /print-agent),
+      // which prints it as a raw ESC/POS raster image -- no page/pagination
+      // concept involved, so no blank-gap bug regardless of printer driver.
+      ReceiptPrinter.printReceipt({
+        elementId: 'receiptContent',
+        paperWidthMm: {{ business.paper_width_mm }},
+        onFallback: function (reason) {
+          if (reason !== 'agent-unavailable') return;
+
+          // Emergency fallback only, for tills that haven't installed the print
+          // agent yet: size the printed page to the actual content height so
+          // window.print() has the best chance of not leaving a gap. Still
+          // subject to the driver-level pagination quirk this whole project
+          // exists to get away from -- installing the agent is the real fix.
+          var contentEl = document.getElementById('receiptContent');
+          var heightMm = Math.ceil(contentEl.scrollHeight * 25.4 / 96) + 4;
+          var style = document.createElement('style');
+          style.textContent = '@page { size: {{ "72mm" if business.paper_width_mm == 80 else "50mm" }} ' + heightMm + 'mm; margin: 0; }';
+          document.head.appendChild(style);
+        }
+      });
+    }
+
+    window.onload = printNow;
   </script>
 </body>
 </html>

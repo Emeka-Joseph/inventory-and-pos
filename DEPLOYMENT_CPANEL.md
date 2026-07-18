@@ -161,15 +161,37 @@ warehouse feature did locally), you'll need to apply that schema change manually
 or a one-off script, since `db.create_all()` only creates missing tables — it won't alter
 existing ones.
 
-For example, the direct thermal-printer (QZ Tray) feature added three columns to `businesses`.
-On an already-deployed database, run this once via phpMyAdmin's SQL tab:
+For example, the direct thermal-printer feature added a `paper_width_mm` column to
+`businesses` (used to size the receipt for the print agent / browser-print fallback). If you
+previously deployed an earlier QZ Tray-based version of this feature, that version also added
+`print_mode` and `printer_name` columns which are no longer used — printer selection now lives
+locally on each till via the print agent's own setup page instead of a per-business cloud
+setting. Run this once via phpMyAdmin's SQL tab to bring an already-deployed database in line:
 
 ```sql
-ALTER TABLE businesses
-  ADD COLUMN print_mode ENUM('browser','qz') NOT NULL DEFAULT 'browser',
-  ADD COLUMN printer_name VARCHAR(150) NULL,
-  ADD COLUMN paper_width_mm INT NOT NULL DEFAULT 80;
+-- Only needed if paper_width_mm doesn't already exist on this database:
+ALTER TABLE businesses ADD COLUMN paper_width_mm INT NOT NULL DEFAULT 80;
+
+-- Only needed if you previously deployed the QZ Tray version of this feature:
+ALTER TABLE businesses DROP COLUMN print_mode, DROP COLUMN printer_name;
 ```
+
+You should also remove `QZ_CERTIFICATE` / `QZ_PRIVATE_KEY` from the Python App's environment
+variables if you'd added them for the earlier QZ Tray version — they're unused now.
+
+### Receipt Print Agent (till-side software, not deployed to this server)
+
+`print-agent/` in this repo is a separate, standalone Python/Flask program — it never runs on
+this server or inside the main Flask app. It gets built into a Windows installer via PyInstaller
++ Inno Setup (see `print-agent/README.md` and `print-agent/installer.iss`) and installed once on
+each till's computer.
+
+The app hosts the download itself at `/print-agent` (linked from Business Settings), serving the
+file from `app/static/downloads/ReceiptPrintAgentSetup.exe`. That folder is gitignored — same
+treatment as `app/static/img/`/`doc/` — so after building a new installer locally
+(`print-agent/installer_output/ReceiptPrintAgentSetup.exe`), upload it to
+`app/static/downloads/` on the server via File Manager. There's no other server-side step;
+nothing in the Flask app needs to know this file changed.
 
 You'll also need `QZ_CERTIFICATE` and `QZ_PRIVATE_KEY` in the Python App's environment variables
 — see `.env.example` and `scripts/generate_qz_cert.py`.

@@ -50,7 +50,8 @@
       // Primary path: hand the receipt to the local print agent (see /print-agent),
       // which prints it as a raw ESC/POS raster image -- no page/pagination
       // concept involved, so no blank-gap bug regardless of printer driver.
-      ReceiptPrinter.printReceipt({
+      // Returns the underlying promise so callers can act once printing is done.
+      return ReceiptPrinter.printReceipt({
         elementId: 'receiptContent',
         paperWidthMm: {{ business.paper_width_mm }},
         onFallback: function (reason) {
@@ -70,7 +71,15 @@
       });
     }
 
-    window.onload = printNow;
+    window.onload = function () {
+      // Auto-print on load (this is the checkout flow's tab), then close it --
+      // the sales rep never asked to see a preview, so don't leave one lingering
+      // for them to dismiss by hand. The manual "Print Receipt" button below
+      // (e.g. reprinting from Sale Details) intentionally does NOT auto-close.
+      printNow().then(function () {
+        window.close();
+      });
+    };
   </script>
 </body>
 </html>

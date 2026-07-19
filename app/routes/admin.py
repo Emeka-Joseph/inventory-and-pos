@@ -732,6 +732,27 @@ def sale_detail(slug, sale_id):
     return render_template('admin/sale_detail.html', business=biz, sale=sale)
 
 
+@admin_bp.route('/<slug>/admin/sales/<int:sale_id>/delete', methods=['POST'])
+@login_required
+def delete_sale(slug, sale_id):
+    biz = _load_biz(slug)
+    sale = Sale.query.filter_by(id=sale_id, business_id=biz.id).first_or_404()
+    period = request.form.get('period', 'today')
+    sale_number = sale.sale_number
+
+    # Deleting a sale should undo its effect on inventory, not just erase the
+    # revenue record -- otherwise stock counts stay permanently understated.
+    for item in sale.items:
+        prod = Product.query.get(item.product_id)
+        if prod:
+            prod.quantity_in_stock += item.quantity
+
+    db.session.delete(sale)
+    db.session.commit()
+    flash(f'Sale {sale_number} deleted and its stock restored.', 'success')
+    return redirect(url_for('admin.sales_history', slug=slug, period=period))
+
+
 # ─── Reports / Analytics ─────────────────────────────────────────────────────
 
 @admin_bp.route('/<slug>/admin/reports')

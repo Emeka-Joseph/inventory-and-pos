@@ -436,9 +436,11 @@ async function processPayment() {
     const data = await res.json();
     if (data.success) {
       bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
-      clearCart();
       window.open(data.receipt_url, '_blank');
-      barcodeInput.focus();
+      // Reload rather than just clearCart(): stock quantities shown on the product
+      // cards were rendered server-side at page load and don't update client-side
+      // after a sale, so a reload is what actually reflects the new DB quantities.
+      location.reload();
     } else { alert('Error: ' + (data.error || 'Unknown error')); }
   } catch { alert('Network error. Please try again.'); }
   finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Complete Sale'; }

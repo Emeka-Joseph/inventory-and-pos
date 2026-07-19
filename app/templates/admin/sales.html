@@ -87,6 +87,14 @@
               <a href="{{ url_for('admin.sale_detail', slug=business.slug, sale_id=s.id) }}" class="btn btn-outline-dark btn-sm">
                 <i class="fa-solid fa-eye"></i>
               </a>
+              <form method="POST" action="{{ url_for('admin.delete_sale', slug=business.slug, sale_id=s.id) }}"
+                    class="d-inline" onsubmit="return confirmDeleteSale('{{ s.sale_number }}')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="period" value="{{ period }}"/>
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </form>
             </td>
           </tr>
           {% else %}
@@ -97,6 +105,13 @@
     </div>
   </div>
 </div>
+
+<script>
+function confirmDeleteSale(saleNumber) {
+  if (!confirm('Delete sale ' + saleNumber + '? This cannot be undone.')) return false;
+  return confirm('Are you absolutely sure? This will permanently delete sale ' + saleNumber + ' and restore the stock it used.');
+}
+</script>
 {% endblock %}
 
 {% block scripts %}

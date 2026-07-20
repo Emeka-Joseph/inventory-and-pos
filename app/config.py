@@ -59,6 +59,13 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = True
+    # Flask-WTF's default CSRF token lifetime is 1 hour, which breaks checkout on
+    # a POS terminal left open longer than that (the classic symptom is a
+    # misleading "Network error" on Complete Sale after a slow shift). The login
+    # session itself has no separate time limit (it lasts until the browser
+    # closes), so tying CSRF tokens to a shorter clock added a failure mode
+    # without adding real protection -- the session is already the boundary.
+    WTF_CSRF_TIME_LIMIT = None
 
     # Set to 'true' in .env to show the real traceback on the 500 error page.
     # Leave off (default) once the site is live for real users — it leaks

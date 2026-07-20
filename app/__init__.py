@@ -1,4 +1,3 @@
-import os
 import traceback
 from flask import Flask, render_template
 from .config import Config
@@ -84,30 +83,4 @@ def create_app(config_class=Config):
         tb = traceback.format_exc() if show_details else None
         return render_template('errors/500.html', traceback=tb), 500
 
-    # Start reorder-alert scheduler (once, even in debug mode)
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        _start_scheduler(app)
-
     return app
-
-
-def _start_scheduler(app):
-    from apscheduler.schedulers.background import BackgroundScheduler
-    from .utils import check_reorder_alerts, check_subscriptions
-
-    scheduler = BackgroundScheduler(daemon=True)
-    scheduler.add_job(
-        func=lambda: check_reorder_alerts(app),
-        trigger='interval',
-        hours=1,
-        id='reorder_alerts',
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        func=lambda: check_subscriptions(app),
-        trigger='interval',
-        hours=1,
-        id='subscription_checks',
-        replace_existing=True,
-    )
-    scheduler.start()

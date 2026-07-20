@@ -433,6 +433,15 @@ async function processPayment() {
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      // A non-2xx response here (e.g. an expired login session) is an HTML error
+      // page, not JSON -- parsing it as JSON would throw and get misreported as
+      // a generic "network error" below. A reload re-establishes a fresh session
+      // and CSRF token, which is what actually resolves this, unlike retrying blind.
+      alert('Your session needs refreshing before this sale can complete. The page will now reload -- please try the sale again after it does.');
+      location.reload();
+      return;
+    }
     const data = await res.json();
     if (data.success) {
       bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
